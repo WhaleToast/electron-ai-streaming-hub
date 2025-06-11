@@ -10,56 +10,57 @@ class StreamingLauncher {
         this.currentProcess = null;
         this.isDevMode = process.argv.includes('--dev');
         this.services = {
-        netflix: {
-            name: 'Netflix',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://netflix.com'],
-            processName: 'firefox',
-            icon: '🎬'
-        },
-        youtube: {
-            name: 'YouTube TV',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/tv'],
-            processName: 'firefox',
-            icon: '📺'
-        },
-        hbo: {
-            name: 'HBO Max',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://play.hbomax.com'],
-            processName: 'firefox',
-            icon: '🎭'
-        },
-        disney: {
-            name: 'Disney+',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://disneyplus.com'],
-            processName: 'firefox',
-            icon: '🏰'
-        },
-        stremio: {
-            name: 'Stremio',
-            command: ['stremio', '--fullscreen'],
-            processName: 'stremio',
-            icon: '🎯',
-            postLaunch: 'fullscreen'
-        },
-        vlc: {
-            name: 'VLC Player',
-            command: ['vlc', '--intf', 'qt', '--fullscreen'],
-            processName: 'vlc',
-            icon: '🎵'
-        },
-        plex: {
-            name: 'Plex',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://app.plex.tv'],
-            processName: 'firefox',
-            icon: '📱'
-        },
-        prime: {
-            name: 'Prime Video',
-            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://primevideo.com'],
-            processName: 'firefox',
-            icon: '📦'
-        }
-    };    }
+            netflix: {
+                name: 'Netflix',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://netflix.com'],
+                processName: 'firefox',
+                icon: '🎬'
+            },
+            youtube: {
+                name: 'YouTube TV',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/tv'],
+                processName: 'firefox',
+                icon: '📺'
+            },
+            hbo: {
+                name: 'HBO Max',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://play.hbomax.com'],
+                processName: 'firefox',
+                icon: '🎭'
+            },
+            disney: {
+                name: 'Disney+',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://disneyplus.com'],
+                processName: 'firefox',
+                icon: '🏰'
+            },
+            stremio: {
+                name: 'Stremio',
+                command: ['stremio', '--fullscreen'],
+                processName: 'stremio',
+                icon: '🎯',
+                postLaunch: 'fullscreen'
+            },
+            vlc: {
+                name: 'VLC Player',
+                command: ['vlc', '--intf', 'qt', '--fullscreen'],
+                processName: 'vlc',
+                icon: '🎵'
+            },
+            plex: {
+                name: 'Plex',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://app.plex.tv'],
+                processName: 'firefox',
+                icon: '📱'
+            },
+            prime: {
+                name: 'Prime Video',
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://primevideo.com'],
+                processName: 'firefox',
+                icon: '📦'
+            }
+        };
+    }
 
     async createWindow() {
         const primaryDisplay = screen.getPrimaryDisplay();
@@ -118,7 +119,7 @@ class StreamingLauncher {
         this.overlayWindow.setAlwaysOnTop(true, 'screen-saver');
         this.overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         this.overlayWindow.loadFile('overlay.html');
-        this.overlayWindow.hide(); // hidden initially
+        this.overlayWindow.hide();
     }
 
     async launchService(serviceId) {
@@ -150,12 +151,33 @@ class StreamingLauncher {
                 setTimeout(() => this.sendFullscreenKey(service.name), 3000);
             }
 
-            this.monitorProcess(service);
+            // Disabled auto monitor logic (manual control via overlay)
+            // this.monitorProcess(service);
 
         } catch (error) {
             console.error(`Failed to launch ${service.name}:`, error);
             this.showLauncher();
         }
+    }
+
+    terminateCurrentService() {
+        if (!this.currentProcess) {
+            this.showLauncher();
+            return;
+        }
+
+        const processName = this.currentProcess.spawnfile || this.currentProcess.file || null;
+        const baseName = processName ? path.basename(processName) : null;
+
+        if (baseName) {
+            spawn('pkill', ['-f', baseName], { stdio: 'ignore' });
+            console.log(`Terminated process: ${baseName}`);
+        } else {
+            console.warn('No active process to terminate.');
+        }
+
+        this.currentProcess = null;
+        this.showLauncher();
     }
 
     sendFullscreenKey(appName) {
@@ -165,51 +187,6 @@ class StreamingLauncher {
         } catch (error) {
             console.log(`Could not send F11 key: ${error.message}`);
         }
-    }
-
-    async monitorProcess(service) {
-        const checkInterval = 3000;
-        let processFound = false;
-        let stableCount = 0;
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const monitor = setInterval(async () => {
-            try {
-                const processes = await psList();
-                const isRunning = processes.some(proc =>
-                    proc.name.toLowerCase().includes(service.processName.toLowerCase()) ||
-                    proc.cmd?.toLowerCase().includes(service.processName.toLowerCase())
-                );
-
-                if (isRunning) {
-                    processFound = true;
-                    stableCount = 0;
-                } else if (processFound) {
-                    stableCount++;
-                    if (stableCount >= 2) {
-                        console.log(`${service.name} process ended`);
-                        clearInterval(monitor);
-                        setTimeout(() => this.showLauncher(), 1000);
-                    }
-                } else {
-                    stableCount++;
-                    if (stableCount >= 10) {
-                        console.log(`${service.name} failed to start`);
-                        clearInterval(monitor);
-                        this.showLauncher();
-                    }
-                }
-            } catch (error) {
-                console.error('Error monitoring process:', error);
-                clearInterval(monitor);
-                setTimeout(() => this.showLauncher(), 2000);
-            }
-        }, checkInterval);
-
-        setTimeout(() => {
-            clearInterval(monitor);
-        }, 45 * 60 * 1000);
     }
 
     showLauncher() {
@@ -237,7 +214,7 @@ class StreamingLauncher {
         });
 
         ipcMain.on('show-launcher', () => {
-            this.showLauncher();
+            this.terminateCurrentService();
         });
     }
 

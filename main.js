@@ -5,6 +5,7 @@ const fs = require('fs');
 
 let mainWindow = null;
 let overlayProcess = null;
+let firefoxLaunched = false; // Track if Firefox is supposed to be running
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -158,33 +159,12 @@ class OverlayWindow(Gtk.Window):
     
     def on_close_clicked(self, button):
         print("=== CLOSE BUTTON CLICKED ===", flush=True)
-        
-        # Check what Firefox processes are running before
-        ps_before = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
-        firefox_before = [line for line in ps_before.stdout.split('\\n') if 'firefox' in line.lower()]
-        print(f"Firefox processes BEFORE kill: {len(firefox_before)}", flush=True)
-        for proc in firefox_before:
-            print(f"  {proc}", flush=True)
-        
         print("About to kill Firefox processes...", flush=True)
         
-        # Kill Firefox processes
-        result1 = subprocess.run(['pkill', '-f', 'firefox.*kiosk'], capture_output=True, text=True)
-        print(f"pkill firefox kiosk result: {result1.returncode}", flush=True)
-        
-        result2 = subprocess.run(['pkill', 'firefox'], capture_output=True, text=True)
-        print(f"pkill firefox result: {result2.returncode}", flush=True)
-        
-        # Wait a moment
-        import time
-        time.sleep(0.5)
-        
-        # Check what's running after
-        ps_after = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
-        firefox_after = [line for line in ps_after.stdout.split('\\n') if 'firefox' in line.lower()]
-        print(f"Firefox processes AFTER kill: {len(firefox_after)}", flush=True)
-        for proc in firefox_after:
-            print(f"  {proc}", flush=True)
+        # Kill Firefox processes aggressively
+        subprocess.run(['pkill', '-f', 'firefox.*kiosk'], capture_output=True)
+        subprocess.run(['pkill', 'firefox'], capture_output=True)
+        subprocess.run(['killall', 'firefox'], capture_output=True)
         
         print("All kill commands completed, quitting overlay...", flush=True)
         print("=== OVERLAY QUITTING ===", flush=True)
@@ -244,66 +224,20 @@ function showCornerOverlay() {
   overlayProcess.on('exit', (code) => {
     console.log('=== OVERLAY PROCESS EXITED ===');
     console.log('Exit code:', code);
-    console.log('Overlay process is now null');
     overlayProcess = null;
     
-    // When overlay exits, focus main window (this happens when X button is clicked)
+    // Set flag that Firefox should NOT be running
+    firefoxLaunched = false;
+    
+    // Focus main window when overlay exits (user clicked X)
     setTimeout(() => {
-      console.log('Attempting to focus main window...');
+      console.log('Focusing main window after overlay exit');
       if (mainWindow) {
-        console.log('Focusing main window after overlay exit');
         mainWindow.focus();
         mainWindow.show();
-      } else {
-        console.log('No main window to focus!');
       }
-    }, 500);
+    }, 300);
   });
-}
-
-function fallbackOverlay() {
-  console.log('Using xterm overlay...');
-  
-  // Create a better-looking xterm overlay
-  const script = `#!/bin/bash
-# Kill any existing overlay
-pkill -f "CLOSE_FIREFOX"
-
-# Create xterm overlay with better positioning
-xterm -geometry 12x4+5+5 \\
-      -bg "#CC0000" \\
-      -fg white \\
-      -title "CLOSE_FIREFOX" \\
-      -fn "9x15bold" \\
-      -iconic \\
-      +sb \\
-      -bc \\
-      -e "bash -c '
-        clear
-        echo \"╔══════════╗\"
-        echo \"║  CLOSE   ║\"
-        echo \"║ FIREFOX  ║\"
-        echo \"╚══════════╝\"
-        echo \"\"
-        echo \"Press ENTER\"
-        read
-        pkill firefox
-        exit
-      '" &
-
-# Store PID for cleanup
-echo \$! > /tmp/overlay_pid
-`;
-  
-  fs.writeFileSync('/tmp/xterm_overlay.sh', script);
-  exec('chmod +x /tmp/xterm_overlay.sh');
-  
-  overlayProcess = spawn('bash', ['/tmp/xterm_overlay.sh'], {
-    stdio: 'ignore',
-    detached: false
-  });
-  
-  console.log('Xterm overlay started');
 }
 
 function hideCornerOverlay() {
@@ -313,44 +247,29 @@ function hideCornerOverlay() {
   }
   
   // Clean up any remaining overlay processes
-  exec('pkill -f CLOSE_FIREFOX');
   exec('pkill -f corner_overlay.py');
   
-  // Clean up PID file
-  exec('rm -f /tmp/overlay_pid');
-}
-
-function closeFirefoxAndFocusMain() {
-  console.log('Manual close: Closing Firefox and returning to main window');
-  
-  // Hide overlay first to prevent any interference
-  hideCornerOverlay();
-  
-  // Kill Firefox
-  exec('pkill firefox', (error) => {
-    if (error) {
-      console.log('No Firefox processes to kill or error occurred');
-    }
-    console.log('Firefox killed by manual close');
-  });
-  
-  // Bring main window to focus after a short delay
-  setTimeout(() => {
-    if (mainWindow) {
-      mainWindow.focus();
-      mainWindow.show();
-    }
-  }, 500);
+  // Set flag that Firefox should NOT be running
+  firefoxLaunched = false;
 }
 
 function launchFirefoxInKioskMode(url) {
   console.log(`Launching Firefox in kiosk mode with URL: ${url}`);
   
+  // Set flag that Firefox is supposed to be running
+  firefoxLaunched = true;
+  
   // Start overlay BEFORE Firefox
   showCornerOverlay();
   
-  // Wait a moment then launch Firefox with explicit display
+  // Wait a moment then launch Firefox
   setTimeout(() => {
+    // Double-check that we still want to launch Firefox
+    if (!firefoxLaunched) {
+      console.log('Firefox launch cancelled');
+      return;
+    }
+    
     const firefoxCommand = `DISPLAY=:0 firefox --new-window --kiosk "${url}"`;
     console.log('Executing:', firefoxCommand);
     
@@ -369,7 +288,7 @@ function launchFirefoxInKioskMode(url) {
         });
       }
     });
-  }, 1000); // Wait 1 second before launching Firefox
+  }, 1000);
 }
 
 app.whenReady().then(createWindow);
@@ -389,11 +308,13 @@ ipcMain.on('launch', (event, data) => {
 
 // Clean up on app quit
 app.on('before-quit', () => {
+  firefoxLaunched = false;
   hideCornerOverlay();
   exec('pkill firefox');
 });
 
 app.on('window-all-closed', () => {
+  firefoxLaunched = false;
   hideCornerOverlay();
   if (process.platform !== 'darwin') {
     app.quit();

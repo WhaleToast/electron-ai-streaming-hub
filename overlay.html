@@ -14,7 +14,7 @@
             left: -120px;
             transition: left 0.3s ease, opacity 0.3s ease;
             opacity: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.0);
             color: white;
             border: none;
             padding: 0.7rem 1rem;
@@ -42,6 +42,7 @@
             if (!visible) {
                 visible = true;
                 button.classList.add('show');
+                element.style.backgroundColor = black;
             }
 
             clearTimeout(hideTimer);

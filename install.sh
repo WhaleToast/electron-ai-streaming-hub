@@ -61,6 +61,16 @@ if ! command -v yay &> /dev/null; then
     cd ~
 fi
 
+# Install emoji font for proper icon rendering
+print_status "Checking for emoji font support..."
+if pacman -Qq noto-fonts-emoji &> /dev/null; then
+    print_status "Emoji font already installed."
+else
+    print_status "Installing noto-fonts-emoji..."
+    sudo pacman -S --needed --noconfirm noto-fonts-emoji
+    print_success "Emoji font installed!"
+fi
+
 # Install Electron via AUR (for better system integration)
 print_status "Installing Electron..."
 yay -S --needed --noconfirm electron

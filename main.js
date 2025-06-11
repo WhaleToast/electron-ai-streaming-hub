@@ -10,9 +10,56 @@ class StreamingLauncher {
         this.currentProcess = null;
         this.isDevMode = process.argv.includes('--dev');
         this.services = {
-            // ... (unchanged service list)
-        };
-    }
+        netflix: {
+            name: 'Netflix',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://netflix.com'],
+            processName: 'firefox',
+            icon: '🎬'
+        },
+        youtube: {
+            name: 'YouTube TV',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/tv'],
+            processName: 'firefox',
+            icon: '📺'
+        },
+        hbo: {
+            name: 'HBO Max',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://play.hbomax.com'],
+            processName: 'firefox',
+            icon: '🎭'
+        },
+        disney: {
+            name: 'Disney+',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://disneyplus.com'],
+            processName: 'firefox',
+            icon: '🏰'
+        },
+        stremio: {
+            name: 'Stremio',
+            command: ['stremio', '--fullscreen'],
+            processName: 'stremio',
+            icon: '🎯',
+            postLaunch: 'fullscreen'
+        },
+        vlc: {
+            name: 'VLC Player',
+            command: ['vlc', '--intf', 'qt', '--fullscreen'],
+            processName: 'vlc',
+            icon: '🎵'
+        },
+        plex: {
+            name: 'Plex',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://app.plex.tv'],
+            processName: 'firefox',
+            icon: '📱'
+        },
+        prime: {
+            name: 'Prime Video',
+            command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://primevideo.com'],
+            processName: 'firefox',
+            icon: '📦'
+        }
+    };    }
 
     async createWindow() {
         const primaryDisplay = screen.getPrimaryDisplay();

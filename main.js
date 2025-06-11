@@ -19,7 +19,7 @@ async function createWindow() {
 }
 
 function createOverlayScript() {
-  // Create a simple GTK overlay script
+  // Create a proper GTK overlay script with fixed CSS
   const overlayScript = `#!/usr/bin/env python3
 import gi
 gi.require_version('Gtk', '3.0')
@@ -28,7 +28,6 @@ from gi.repository import Gtk, Gdk, GLib
 import subprocess
 import sys
 import signal
-import os
 
 class OverlayWindow(Gtk.Window):
     def __init__(self):
@@ -36,7 +35,7 @@ class OverlayWindow(Gtk.Window):
         
         print("Creating overlay window...", flush=True)
         
-        # Window setup - be more aggressive about staying on top
+        # Window setup - aggressive about staying on top
         self.set_title("Close Firefox")
         self.set_default_size(100, 100)
         self.set_resizable(False)
@@ -44,15 +43,17 @@ class OverlayWindow(Gtk.Window):
         self.set_keep_above(True)
         self.set_skip_taskbar_hint(True)
         self.set_skip_pager_hint(True)
-        self.set_type_hint(Gdk.WindowTypeHint.DOCK)  # Makes it more likely to stay on top
+        
+        # Use DOCK type hint - this makes it stay on top of everything
+        self.set_type_hint(Gdk.WindowTypeHint.DOCK)
         
         # Position in top-left corner
-        self.move(0, 0)
+        self.move(10, 10)
         
-        # Make window semi-transparent
+        # Make window transparent
         screen = self.get_screen()
         visual = screen.get_rgba_visual()
-        if visual:
+        if visual and screen.is_composited():
             self.set_visual(visual)
         self.set_app_paintable(True)
         
@@ -61,24 +62,24 @@ class OverlayWindow(Gtk.Window):
         self.button.set_label("✕")
         self.button.connect("clicked", self.on_close_clicked)
         
-        # Style the button
+        # Fixed CSS without transform property
         css = b"""
         window {
             background: transparent;
         }
         button {
-            background: rgba(255, 0, 0, 0.9);
+            background: rgba(220, 20, 20, 0.9);
             color: white;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
-            border: 2px solid white;
-            border-radius: 50px;
+            border: 3px solid white;
+            border-radius: 40px;
             min-width: 80px;
             min-height: 80px;
         }
         button:hover {
             background: rgba(255, 0, 0, 1.0);
-            transform: scale(1.1);
+            border: 3px solid yellow;
         }
         """
         
@@ -92,35 +93,59 @@ class OverlayWindow(Gtk.Window):
         
         self.add(self.button)
         
-        # Connect drawing signal for transparency
+        # Connect events
         self.connect("draw", self.on_draw)
         self.connect("delete-event", Gtk.main_quit)
+        self.connect("enter-notify-event", self.on_mouse_enter)
+        self.connect("leave-notify-event", self.on_mouse_leave)
         
-        # Show immediately
+        # Show with full opacity initially
+        self.set_opacity(1.0)
         self.show_all()
         
-        # Force window to front periodically
-        GLib.timeout_add(1000, self.force_to_front)
+        # Force to top every second
+        GLib.timeout_add(500, self.force_to_top)
+        
+        # Fade out after 3 seconds
+        GLib.timeout_add(3000, self.fade_out)
         
         print("Overlay window created and shown", flush=True)
     
-    def force_to_front(self):
-        """Periodically force window to stay on top"""
+    def force_to_top(self):
+        """Aggressively keep window on top"""
         self.set_keep_above(True)
         self.present()
-        return True  # Continue calling this function
+        self.get_window().raise_()
+        return True  # Continue calling
     
     def on_draw(self, widget, cr):
-        # Make background transparent
+        """Make window background transparent"""
         cr.set_source_rgba(0, 0, 0, 0)
         cr.set_operator(1)  # CAIRO_OPERATOR_SOURCE
         cr.paint()
         return False
     
+    def fade_out(self):
+        """Fade to low opacity after delay"""
+        self.set_opacity(0.3)
+        print("Faded to low opacity", flush=True)
+        return False
+    
+    def on_mouse_enter(self, widget, event):
+        """Show full opacity on hover"""
+        self.set_opacity(1.0)
+        print("Mouse enter - full opacity", flush=True)
+        return False
+    
+    def on_mouse_leave(self, widget, event):
+        """Return to low opacity when mouse leaves"""
+        self.set_opacity(0.3)
+        print("Mouse leave - low opacity", flush=True)
+        return False
+    
     def on_close_clicked(self, button):
         print("Close button clicked, killing Firefox...", flush=True)
-        # Kill Firefox and quit overlay
-        subprocess.run(['pkill', 'firefox'], capture_output=True)
+        subprocess.run(['pkill', 'firefox'])
         print("Firefox killed, quitting overlay", flush=True)
         Gtk.main_quit()
 
@@ -128,23 +153,20 @@ def signal_handler(sig, frame):
     print("Signal received, quitting...", flush=True)
     Gtk.main_quit()
 
-# Handle signals gracefully
+# Handle signals
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 print("Starting overlay application...", flush=True)
 
-# Start the overlay
-app = OverlayWindow()
+# Create and run overlay
 try:
-    print("Starting GTK main loop...", flush=True)
+    app = OverlayWindow()
     Gtk.main()
     print("GTK main loop ended", flush=True)
-except KeyboardInterrupt:
-    print("Keyboard interrupt", flush=True)
-    pass
 except Exception as e:
     print(f"Error: {e}", flush=True)
+    sys.exit(1)
 `;
 
   fs.writeFileSync('/tmp/corner_overlay.py', overlayScript);
@@ -156,10 +178,36 @@ function showCornerOverlay() {
     overlayProcess.kill();
   }
   
-  console.log('Starting corner overlay...');
+  console.log('Starting GTK corner overlay...');
+  createOverlayScript();
   
-  // Use the reliable xterm fallback
-  fallbackOverlay();
+  // Start the GTK overlay process
+  overlayProcess = spawn('python3', ['/tmp/corner_overlay.py'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: false
+  });
+  
+  overlayProcess.stdout.on('data', (data) => {
+    console.log('Overlay:', data.toString().trim());
+  });
+  
+  overlayProcess.stderr.on('data', (data) => {
+    console.error('Overlay error:', data.toString().trim());
+  });
+  
+  overlayProcess.on('error', (error) => {
+    console.error('Failed to start GTK overlay:', error);
+    console.log('Falling back to xterm overlay...');
+    fallbackOverlay();
+  });
+  
+  overlayProcess.on('exit', (code) => {
+    console.log('Overlay process exited with code:', code);
+    if (code !== 0) {
+      console.log('GTK overlay failed, using xterm fallback...');
+      fallbackOverlay();
+    }
+  });
 }
 
 function fallbackOverlay() {

@@ -73,7 +73,7 @@ mkdir -p "$APP_DIR"
 # Copy application files (assuming they're in current directory)
 if [ -f "package.json" ]; then
     print_status "Copying application files..."
-    cp package.json main.js preload.js index.html styles.css renderer.js "$APP_DIR/"
+    cp package.json main.js preload.js index.html styles.css renderer.js overlayPreloa.js overlay.html "$APP_DIR/"
     
     # Install npm dependencies
     print_status "Installing npm dependencies..."

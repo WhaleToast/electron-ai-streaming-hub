@@ -157,47 +157,54 @@ function showCornerOverlay() {
   }
   
   console.log('Starting corner overlay...');
-  createOverlayScript();
   
-  // Start the overlay process with visible output for debugging
-  overlayProcess = spawn('python3', ['/tmp/corner_overlay.py'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: false
-  });
-  
-  overlayProcess.stdout.on('data', (data) => {
-    console.log('Overlay stdout:', data.toString());
-  });
-  
-  overlayProcess.stderr.on('data', (data) => {
-    console.error('Overlay stderr:', data.toString());
-  });
-  
-  overlayProcess.on('error', (error) => {
-    console.error('Failed to start overlay:', error);
-    // Fallback: create a simpler overlay using xterm
-    fallbackOverlay();
-  });
-  
-  overlayProcess.on('exit', (code) => {
-    console.log('Overlay process exited with code:', code);
-  });
+  // Use the reliable xterm fallback
+  fallbackOverlay();
 }
 
 function fallbackOverlay() {
-  // Fallback: create a simple xterm overlay
+  console.log('Using xterm overlay...');
+  
+  // Create a better-looking xterm overlay
   const script = `#!/bin/bash
-xterm -geometry 10x3+0+0 -bg red -fg white -title "Close" -e "
-echo 'Click to close Firefox'
-echo 'Press ENTER to close'
-read
-pkill firefox
-" &
+# Kill any existing overlay
+pkill -f "CLOSE_FIREFOX"
+
+# Create xterm overlay with better positioning
+xterm -geometry 12x4+5+5 \\
+      -bg "#CC0000" \\
+      -fg white \\
+      -title "CLOSE_FIREFOX" \\
+      -fn "9x15bold" \\
+      -iconic \\
+      +sb \\
+      -bc \\
+      -e "bash -c '
+        clear
+        echo \"╔══════════╗\"
+        echo \"║  CLOSE   ║\"
+        echo \"║ FIREFOX  ║\"
+        echo \"╚══════════╝\"
+        echo \"\"
+        echo \"Press ENTER\"
+        read
+        pkill firefox
+        exit
+      '" &
+
+# Store PID for cleanup
+echo \$! > /tmp/overlay_pid
 `;
   
-  fs.writeFileSync('/tmp/simple_overlay.sh', script);
-  exec('chmod +x /tmp/simple_overlay.sh');
-  exec('/tmp/simple_overlay.sh');
+  fs.writeFileSync('/tmp/xterm_overlay.sh', script);
+  exec('chmod +x /tmp/xterm_overlay.sh');
+  
+  overlayProcess = spawn('bash', ['/tmp/xterm_overlay.sh'], {
+    stdio: 'ignore',
+    detached: false
+  });
+  
+  console.log('Xterm overlay started');
 }
 
 function hideCornerOverlay() {
@@ -206,9 +213,12 @@ function hideCornerOverlay() {
     overlayProcess = null;
   }
   
-  // Also kill any fallback overlays
+  // Clean up any remaining overlay processes
+  exec('pkill -f CLOSE_FIREFOX');
   exec('pkill -f corner_overlay.py');
-  exec('pkill -f simple_overlay.sh');
+  
+  // Clean up PID file
+  exec('rm -f /tmp/overlay_pid');
 }
 
 function closeFirefoxAndFocusMain() {

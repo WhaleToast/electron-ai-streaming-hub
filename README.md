@@ -1,11 +1,11 @@
 # IF YOU FOUND THIS. BEWARE. THIS IS 99% VIBE CODED. PURE AI BABY
 I have tested and it works, but everything you see here is made by ChatGPT or Claude. I only made some small changes once everything was working.
 Honestly kinda crazy that it even works
+I added ---- in this README where I actually wrote something and the AI. 
 
+# 🎬 Streaming Launcher for your ----Arch openbox installation---- 
 
-# 🎬 Streaming Launcher for Intel NUC
-
-A modern, mouse-controlled streaming launcher built with Electron for Arch Linux + Openbox. Perfect for converting your Intel NUC into a dedicated streaming box.
+A modern, mouse-controlled streaming launcher built with Electron for Arch Linux + Openbox. Perfect for converting your ----old computer---- into a dedicated streaming box.
 
 ![Streaming Launcher](https://via.placeholder.com/800x450/0a0e1a/ffffff?text=Modern+Streaming+Interface)
 
@@ -28,15 +28,13 @@ A modern, mouse-controlled streaming launcher built with Electron for Arch Linux
 - HBO Max
 - Disney+
 - Prime Video
-- Plex
 - Stremio (native app)
-- VLC Player
 
 ## 🛠️ Installation
 
 ### Automatic Installation (Recommended)
 
-1. **Download all files** to a directory on your Intel NUC
+1. **Download all files** to a directory on computer
 2. **Run the installation script**:
    ```bash
    chmod +x install.sh

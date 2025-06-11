@@ -163,6 +163,67 @@
             box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5);
         }
 
+        .nav-controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .nav-controls.show {
+            display: flex;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn.home {
+            background: var(--accent);
+        }
+
+        .nav-btn.home:hover {
+            background: #c73650;
+        }
+
+        .corner-trigger {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100px;
+            height: 100px;
+            z-index: 9999;
+            background: transparent;
+        }
+
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -259,6 +320,22 @@
         </div>
     </div>
 
+    <!-- Navigation Controls (hidden initially) -->
+    <div class="nav-controls" id="navControls">
+        <div class="nav-left">
+            <button class="nav-btn home" onclick="goHome()">🏠 Home</button>
+            <button class="nav-btn" onclick="goBack()">← Back</button>
+            <button class="nav-btn" onclick="goForward()">Forward →</button>
+            <button class="nav-btn" onclick="refreshPage()">🔄 Refresh</button>
+        </div>
+        <div class="nav-right">
+            <button class="nav-btn" onclick="closeCurrentTab()">✕ Close Tab</button>
+        </div>
+    </div>
+
+    <!-- Corner trigger for showing nav controls -->
+    <div class="corner-trigger" onmouseenter="showNavControls()" onmouseleave="startHideTimer()"></div>
+
     <button class="close-button" onclick="closeKiosk()" title="Exit Kiosk Mode">✕</button>
 
     <div class="loading-overlay" id="loadingOverlay">
@@ -267,6 +344,9 @@
     </div>
 
     <script>
+        let hideNavTimer = null;
+        let isKioskMode = false;
+
         // Handle app launching
         document.querySelectorAll('.app-card').forEach(card => {
             card.addEventListener('click', function() {
@@ -276,15 +356,14 @@
                 showLoading();
                 
                 if (url) {
-                    // Launch web app in new window/tab
+                    // Launch web app in same window
                     setTimeout(() => {
-                        window.open(url, '_blank');
-                        hideLoading();
+                        isKioskMode = true;
+                        window.location.href = url;
                     }, 1000);
                 } else if (app === 'stremio') {
-                    // For Stremio, we'd need a backend service to launch it
-                    // For now, just show a message
-                    alert('Stremio launching would require a backend service');
+                    // Send message to backend to launch Stremio
+                    launchStremio();
                     hideLoading();
                 }
             });
@@ -298,27 +377,121 @@
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
-        function closeKiosk() {
-            if (confirm('Exit Media Center?')) {
-                // In a real kiosk, this would communicate with the system
+        function launchStremio() {
+            // Create a temporary form to send POST request to backend
+            fetch('/launch-stremio', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ app: 'stremio' })
+            }).catch(() => {
+                // If no backend, show manual instruction
+                alert('Stremio launching requires backend service. Run: stremio &');
+            });
+        }
+
+        function showNavControls() {
+            clearTimeout(hideNavTimer);
+            const navControls = document.getElementById('navControls');
+            navControls.classList.add('show');
+        }
+
+        function startHideTimer() {
+            hideNavTimer = setTimeout(() => {
+                const navControls = document.getElementById('navControls');
+                navControls.classList.remove('show');
+            }, 2000);
+        }
+
+        function goHome() {
+            window.location.href = window.location.origin + window.location.pathname;
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function goForward() {
+            window.history.forward();
+        }
+
+        function refreshPage() {
+            window.location.reload();
+        }
+
+        function closeCurrentTab() {
+            // Try to go back to home, or close if possible
+            if (window.history.length > 1) {
+                goHome();
+            } else {
                 window.close();
             }
         }
 
+        function closeKiosk() {
+            if (confirm('Exit Media Center?')) {
+                // Send close signal to backend
+                fetch('/close-kiosk', { method: 'POST' }).catch(() => {});
+                window.close();
+            }
+        }
+
+        // Keep nav controls visible when hovering over them
+        document.getElementById('navControls').addEventListener('mouseenter', () => {
+            clearTimeout(hideNavTimer);
+        });
+
+        document.getElementById('navControls').addEventListener('mouseleave', () => {
+            startHideTimer();
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            // ESC to close
+            // ESC to show/hide nav controls
             if (e.key === 'Escape') {
+                const navControls = document.getElementById('navControls');
+                if (navControls.classList.contains('show')) {
+                    navControls.classList.remove('show');
+                } else {
+                    showNavControls();
+                }
+            }
+            
+            // Alt+H for home
+            if (e.altKey && e.key === 'h') {
+                e.preventDefault();
+                goHome();
+            }
+            
+            // Ctrl+Q to quit
+            if (e.ctrlKey && e.key === 'q') {
+                e.preventDefault();
                 closeKiosk();
             }
             
-            // Number keys to select apps
-            const num = parseInt(e.key);
-            if (num >= 1 && num <= 6) {
-                const cards = document.querySelectorAll('.app-card');
-                if (cards[num - 1]) {
-                    cards[num - 1].click();
+            // Number keys to select apps (only on home screen)
+            if (!isKioskMode) {
+                const num = parseInt(e.key);
+                if (num >= 1 && num <= 6) {
+                    const cards = document.querySelectorAll('.app-card');
+                    if (cards[num - 1]) {
+                        cards[num - 1].click();
+                    }
                 }
+            }
+        });
+
+        // Detect if we're on a streaming site (not the home page)
+        window.addEventListener('load', function() {
+            const currentDomain = window.location.hostname;
+            const streamingSites = ['netflix.com', 'youtube.com', 'disneyplus.com', 'primevideo.com', 'hbomax.com'];
+            
+            if (streamingSites.some(site => currentDomain.includes(site))) {
+                isKioskMode = true;
+                // Auto-show nav controls briefly on load
+                showNavControls();
+                setTimeout(() => {
+                    document.getElementById('navControls').classList.remove('show');
+                }, 3000);
             }
         });
 

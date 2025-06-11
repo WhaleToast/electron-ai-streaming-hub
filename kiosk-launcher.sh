@@ -89,6 +89,10 @@ start_kiosk() {
     # Set up kiosk environment
     setup_environment
     
+    # Start simple backend server for handling close requests
+    start_backend_server &
+    local backend_pid=$!
+    
     # Launch Firefox with the kiosk interface
     log "Launching Firefox in kiosk mode..."
     firefox \
@@ -98,9 +102,9 @@ start_kiosk() {
         "file://$KIOSK_HTML" &
     
     local firefox_pid=$!
-    echo $firefox_pid > "$KIOSK_PID_FILE"
+    echo "$firefox_pid $backend_pid" > "$KIOSK_PID_FILE"
     
-    log "Kiosk started with PID: $firefox_pid"
+    log "Kiosk started with Firefox PID: $firefox_pid, Backend PID: $backend_pid"
     log "HTML file: $KIOSK_HTML"
     
     # Wait for Firefox to start
@@ -109,11 +113,73 @@ start_kiosk() {
     # Try to ensure it's fullscreen
     ensure_fullscreen
     
-    # Monitor the process
+    # Wait for Firefox to exit
     wait $firefox_pid
+    
+    # Clean up backend
+    if kill -0 $backend_pid 2>/dev/null; then
+        kill $backend_pid
+    fi
     
     log "Kiosk session ended"
     cleanup
+}
+
+# Simple backend server to handle close requests
+start_backend_server() {
+    # Create a simple HTTP server using netcat or Python
+    if command -v python3 &> /dev/null; then
+        python3 -c "
+import http.server
+import socketserver
+import subprocess
+import json
+import sys
+from urllib.parse import urlparse, parse_qs
+
+class KioskHandler(http.server.SimpleHTTPRequestHandler):
+    def do_POST(self):
+        if self.path == '/close-kiosk':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b'{\"status\": \"closing\"}')
+            
+            # Kill Firefox and exit
+            subprocess.run(['pkill', 'firefox'], capture_output=True)
+            sys.exit(0)
+            
+        elif self.path == '/launch-stremio':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b'{\"status\": \"launching\"}')
+            
+            # Launch Stremio
+            try:
+                subprocess.Popen(['stremio'], env={'DISPLAY': ':0'})
+            except:
+                try:
+                    subprocess.Popen(['flatpak', 'run', 'com.stremio.Stremio'], env={'DISPLAY': ':0'})
+                except:
+                    pass
+    
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def log_message(self, format, *args):
+        pass  # Suppress logs
+
+with socketserver.TCPServer(('127.0.0.1', 8888), KioskHandler) as httpd:
+    httpd.serve_forever()
+" 2>/dev/null &
+    fi
 }
 
 # Set up kiosk environment
@@ -207,11 +273,13 @@ stop_kiosk() {
     log "Stopping kiosk..."
     
     if [ -f "$KIOSK_PID_FILE" ]; then
-        local pid=$(cat "$KIOSK_PID_FILE")
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid"
-            log "Killed kiosk process $pid"
-        fi
+        local pids=$(cat "$KIOSK_PID_FILE")
+        for pid in $pids; do
+            if kill -0 "$pid" 2>/dev/null; then
+                kill "$pid"
+                log "Killed process $pid"
+            fi
+        done
         rm -f "$KIOSK_PID_FILE"
     fi
     
@@ -219,6 +287,7 @@ stop_kiosk() {
     pkill firefox 2>/dev/null || true
     pkill stremio 2>/dev/null || true
     pkill unclutter 2>/dev/null || true
+    pkill -f "python3.*8888" 2>/dev/null || true
     
     cleanup
 }

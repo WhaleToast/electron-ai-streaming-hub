@@ -205,32 +205,12 @@ class StreamingLauncher {
             this.terminateCurrentService();
         });
         ipcMain.handle('shutdown', () => {
-            spawn('systemctl', ['reboot'], { stdio: 'ignore', detached: true });
+            spawn('systemctl', ['poweroff'], { stdio: 'ignore', detached: true });
         });
 
         ipcMain.handle('restart', () => {
-        console.log('Attempting to reboot...');
-        const child = spawn('systemctl', ['reboot'], { 
-            stdio: ['ignore', 'pipe', 'pipe'], 
-            detached: true 
+        spawn('systemctl', ['restart'], { stdio: 'ignore', detached: true });
         });
-        
-        child.stdout.on('data', (data) => {
-            console.log('Reboot stdout:', data.toString());
-        });
-        
-        child.stderr.on('data', (data) => {
-            console.error('Reboot stderr:', data.toString());
-        });
-        
-        child.on('error', (error) => {
-            console.error('Reboot spawn error:', error);
-        });
-        
-        child.on('close', (code) => {
-            console.log('Reboot process closed with code:', code);
-        });
-    });
     }
 
     async initialize() {

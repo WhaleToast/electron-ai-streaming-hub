@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Media Kiosk</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-size: 2em;
+    }
+    .button {
+      margin: 20px;
+      padding: 20px;
+      background: #444;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      color: white;
+    }
+    .button:hover {
+      background: #666;
+    }
+  </style>
+</head>
+<body>
+  <button class="button" onclick="launchURL('https://www.youtube.com')">YouTube</button>
+  <button class="button" onclick="launchURL('https://www.netflix.com')">Netflix</button>
+  <button class="button" onclick="launchApp('stremio')">Stremio</button>
+
+  <script>
+    function launchURL(url) {
+      window.api.launch({ type: 'url', target: url });
+    }
+
+    function launchApp(appCommand) {
+      window.api.launch({ type: 'app', target: appCommand });
+    }
+  </script>
+</body>
+</html>
+

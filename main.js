@@ -200,7 +200,7 @@ function showCornerOverlay() {
     overlayProcess.kill();
   }
   
-  console.log('Starting GTK corner overlay...');
+  console.log('=== STARTING OVERLAY ===');
   createOverlayScript();
   
   // Start the GTK overlay process
@@ -224,6 +224,7 @@ function showCornerOverlay() {
   overlayProcess.on('exit', (code) => {
     console.log('=== OVERLAY PROCESS EXITED ===');
     console.log('Exit code:', code);
+    console.log('Setting firefoxLaunched to false');
     overlayProcess = null;
     
     // Set flag that Firefox should NOT be running
@@ -231,10 +232,13 @@ function showCornerOverlay() {
     
     // Focus main window when overlay exits (user clicked X)
     setTimeout(() => {
-      console.log('Focusing main window after overlay exit');
+      console.log('=== FOCUSING MAIN WINDOW AFTER OVERLAY EXIT ===');
       if (mainWindow) {
         mainWindow.focus();
         mainWindow.show();
+        console.log('Main window focused');
+      } else {
+        console.log('No main window to focus');
       }
     }, 300);
   });
@@ -254,7 +258,9 @@ function hideCornerOverlay() {
 }
 
 function launchFirefoxInKioskMode(url) {
-  console.log(`Launching Firefox in kiosk mode with URL: ${url}`);
+  console.log(`=== LAUNCH FIREFOX CALLED ===`);
+  console.log(`URL: ${url}`);
+  console.log(`firefoxLaunched flag: ${firefoxLaunched}`);
   
   // Set flag that Firefox is supposed to be running
   firefoxLaunched = true;
@@ -264,9 +270,12 @@ function launchFirefoxInKioskMode(url) {
   
   // Wait a moment then launch Firefox
   setTimeout(() => {
+    console.log(`=== ABOUT TO LAUNCH FIREFOX ===`);
+    console.log(`firefoxLaunched flag is now: ${firefoxLaunched}`);
+    
     // Double-check that we still want to launch Firefox
     if (!firefoxLaunched) {
-      console.log('Firefox launch cancelled');
+      console.log('Firefox launch cancelled due to flag');
       return;
     }
     

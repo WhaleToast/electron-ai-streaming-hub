@@ -13,33 +13,34 @@ class StreamingLauncher {
         this.services = {
             netflix: {
                 name: 'Netflix',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://netflix.com'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://netflix.com'],
                 processName: 'firefox',
                 icon: '🎬'
             },
             youtube: {
                 name: 'YouTube TV',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://youtube.com/tv'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/tv'],
                 processName: 'firefox',
                 icon: '📺'
             },
             hbo: {
                 name: 'HBO Max',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://play.hbomax.com'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://play.hbomax.com'],
                 processName: 'firefox',
                 icon: '🎭'
             },
             disney: {
                 name: 'Disney+',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://disneyplus.com'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://disneyplus.com'],
                 processName: 'firefox',
                 icon: '🏰'
             },
             stremio: {
                 name: 'Stremio',
-                command: ['stremio'],
+                command: ['stremio', '--fullscreen'],
                 processName: 'stremio',
-                icon: '🎯'
+                icon: '🎯',
+                postLaunch: 'fullscreen'
             },
             vlc: {
                 name: 'VLC Player',
@@ -49,13 +50,13 @@ class StreamingLauncher {
             },
             plex: {
                 name: 'Plex',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://app.plex.tv'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://app.plex.tv'],
                 processName: 'firefox',
                 icon: '📱'
             },
             prime: {
                 name: 'Prime Video',
-                command: ['firefox', '--kiosk', '--no-first-run', 'https://primevideo.com'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://primevideo.com'],
                 processName: 'firefox',
                 icon: '📦'
             }
@@ -114,11 +115,28 @@ class StreamingLauncher {
             // Hide the launcher window
             this.mainWindow.hide();
             
+            // Kill existing Firefox processes if launching a web service
+            if (service.processName === 'firefox') {
+                try {
+                    spawn('pkill', ['-f', 'firefox'], { stdio: 'ignore' });
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for processes to close
+                } catch (error) {
+                    // Ignore errors, Firefox might not be running
+                }
+            }
+            
             // Launch the service
             this.currentProcess = spawn(service.command[0], service.command.slice(1), {
                 detached: true,
                 stdio: 'ignore'
             });
+
+            // Handle post-launch actions (like sending F11 for fullscreen)
+            if (service.postLaunch === 'fullscreen') {
+                setTimeout(() => {
+                    this.sendFullscreenKey(service.name);
+                }, 3000); // Wait 3 seconds for app to load
+            }
 
             // Monitor the process
             this.monitorProcess(service);
@@ -129,32 +147,65 @@ class StreamingLauncher {
         }
     }
 
+    sendFullscreenKey(appName) {
+        try {
+            // Send F11 key to the focused window using xdotool
+            spawn('xdotool', ['key', 'F11'], { stdio: 'ignore' });
+            console.log(`Sent F11 to ${appName}`);
+        } catch (error) {
+            console.log(`Could not send F11 key (xdotool not installed?): ${error.message}`);
+        }
+    }
+
     async monitorProcess(service) {
-        const checkInterval = 2000; // Check every 2 seconds
+        const checkInterval = 3000; // Check every 3 seconds
+        let processFound = false;
+        let stableCount = 0;
+        
+        // Wait a bit for process to fully start
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         const monitor = setInterval(async () => {
             try {
                 const processes = await psList();
                 const isRunning = processes.some(proc => 
-                    proc.name.toLowerCase().includes(service.processName.toLowerCase())
+                    proc.name.toLowerCase().includes(service.processName.toLowerCase()) ||
+                    proc.cmd?.toLowerCase().includes(service.processName.toLowerCase())
                 );
 
-                if (!isRunning) {
-                    console.log(`${service.name} process ended`);
-                    clearInterval(monitor);
-                    setTimeout(() => this.showLauncher(), 1000);
+                if (isRunning) {
+                    processFound = true;
+                    stableCount = 0; // Reset counter when process is found
+                } else if (processFound) {
+                    // Process was running but now isn't
+                    stableCount++;
+                    
+                    // Wait for 2 consecutive checks before returning to launcher
+                    if (stableCount >= 2) {
+                        console.log(`${service.name} process ended`);
+                        clearInterval(monitor);
+                        setTimeout(() => this.showLauncher(), 1000);
+                    }
+                } else {
+                    // Process never started, keep waiting for a bit longer
+                    stableCount++;
+                    if (stableCount >= 10) { // 30 seconds max wait
+                        console.log(`${service.name} failed to start`);
+                        clearInterval(monitor);
+                        this.showLauncher();
+                    }
                 }
             } catch (error) {
                 console.error('Error monitoring process:', error);
                 clearInterval(monitor);
-                this.showLauncher();
+                setTimeout(() => this.showLauncher(), 2000);
             }
         }, checkInterval);
 
-        // Fallback timeout (30 minutes max)
+        // Fallback timeout (45 minutes max)
         setTimeout(() => {
             clearInterval(monitor);
-        }, 30 * 60 * 1000);
+        }, 45 * 60 * 1000);
     }
 
     showLauncher() {

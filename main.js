@@ -136,7 +136,7 @@ class StreamingLauncher {
             });
 
             if (service.postLaunch === 'fullscreen') {
-                setTimeout(() => this.sendFullscreenKey(service.name), 3000);
+                setTimeout(() => this.sendFullscreenKey(service.name), 2000);
             }
 
             // Disabled auto monitor logic (manual control via overlay)

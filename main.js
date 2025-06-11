@@ -157,12 +157,37 @@ class OverlayWindow(Gtk.Window):
         return False
     
     def on_close_clicked(self, button):
-        print("Close button clicked, killing Firefox...", flush=True)
-        # Be more aggressive about killing Firefox
-        subprocess.run(['pkill', '-f', 'firefox.*kiosk'])
-        subprocess.run(['pkill', 'firefox'])
-        subprocess.run(['killall', 'firefox'], capture_output=True)  # Fallback
-        print("Firefox killed, quitting overlay immediately", flush=True)
+        print("=== CLOSE BUTTON CLICKED ===", flush=True)
+        
+        # Check what Firefox processes are running before
+        ps_before = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+        firefox_before = [line for line in ps_before.stdout.split('\\n') if 'firefox' in line.lower()]
+        print(f"Firefox processes BEFORE kill: {len(firefox_before)}", flush=True)
+        for proc in firefox_before:
+            print(f"  {proc}", flush=True)
+        
+        print("About to kill Firefox processes...", flush=True)
+        
+        # Kill Firefox processes
+        result1 = subprocess.run(['pkill', '-f', 'firefox.*kiosk'], capture_output=True, text=True)
+        print(f"pkill firefox kiosk result: {result1.returncode}", flush=True)
+        
+        result2 = subprocess.run(['pkill', 'firefox'], capture_output=True, text=True)
+        print(f"pkill firefox result: {result2.returncode}", flush=True)
+        
+        # Wait a moment
+        import time
+        time.sleep(0.5)
+        
+        # Check what's running after
+        ps_after = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+        firefox_after = [line for line in ps_after.stdout.split('\\n') if 'firefox' in line.lower()]
+        print(f"Firefox processes AFTER kill: {len(firefox_after)}", flush=True)
+        for proc in firefox_after:
+            print(f"  {proc}", flush=True)
+        
+        print("All kill commands completed, quitting overlay...", flush=True)
+        print("=== OVERLAY QUITTING ===", flush=True)
         Gtk.main_quit()
 
 def signal_handler(sig, frame):
@@ -191,6 +216,7 @@ except Exception as e:
 
 function showCornerOverlay() {
   if (overlayProcess) {
+    console.log('Killing existing overlay process...');
     overlayProcess.kill();
   }
   
@@ -216,17 +242,22 @@ function showCornerOverlay() {
   });
   
   overlayProcess.on('exit', (code) => {
-    console.log('Overlay process exited with code:', code);
+    console.log('=== OVERLAY PROCESS EXITED ===');
+    console.log('Exit code:', code);
+    console.log('Overlay process is now null');
     overlayProcess = null;
     
     // When overlay exits, focus main window (this happens when X button is clicked)
     setTimeout(() => {
+      console.log('Attempting to focus main window...');
       if (mainWindow) {
-        console.log('Overlay exited, focusing main window');
+        console.log('Focusing main window after overlay exit');
         mainWindow.focus();
         mainWindow.show();
+      } else {
+        console.log('No main window to focus!');
       }
-    }, 300);
+    }, 500);
   });
 }
 
@@ -340,7 +371,7 @@ function launchFirefoxInKioskMode(url) {
     });
   }, 1000); // Wait 1 second before launching Firefox
 } Firefox
-
+}
 
 app.whenReady().then(createWindow);
 

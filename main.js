@@ -21,7 +21,7 @@ async function createWindow() {
 }
 
 function createOverlayScript() {
-  // Create a proper GTK overlay script with fixed CSS
+  // Create a sliding dock overlay script
   const overlayScript = `#!/usr/bin/env python3
 import gi
 gi.require_version('Gtk', '3.0')
@@ -31,28 +31,36 @@ import subprocess
 import sys
 import signal
 
-class OverlayWindow(Gtk.Window):
+class SlidingDock(Gtk.Window):
     def __init__(self):
         super().__init__()
         
-        print("Creating overlay window...", flush=True)
+        print("Creating sliding dock...", flush=True)
         
-        # Window setup - DOCK type with strut to stay above fullscreen apps
-        self.set_title("Close Firefox")
-        self.set_default_size(100, 100)
+        # Window setup - sliding dock
+        self.set_title("Sliding Close Dock")
+        self.set_default_size(80, 80)
         self.set_resizable(False)
         self.set_decorated(False)
-        self.set_keep_above(True)
         self.set_skip_taskbar_hint(True)
         self.set_skip_pager_hint(True)
-        self.set_accept_focus(False)  # This prevents stealing focus!
-        self.set_focus_on_map(False)  # Don't take focus when shown
+        self.set_accept_focus(False)
+        self.set_focus_on_map(False)
         
-        # Use DOCK type hint - critical for staying above fullscreen
+        # Use DOCK type hint for proper layering
         self.set_type_hint(Gdk.WindowTypeHint.DOCK)
         
-        # Position in top-left corner
-        self.move(10, 10)
+        # Start hidden off-screen at top-left corner
+        self.hidden_x = -70  # Most of the window off-screen
+        self.hidden_y = 0
+        self.visible_x = 0   # Fully visible position
+        self.visible_y = 0
+        
+        self.move(self.hidden_x, self.hidden_y)
+        
+        # State tracking
+        self.is_visible = False
+        self.slide_timer = None
         
         # Make window transparent
         screen = self.get_screen()
@@ -61,29 +69,29 @@ class OverlayWindow(Gtk.Window):
             self.set_visual(visual)
         self.set_app_paintable(True)
         
-        # Create button
+        # Create close button
         self.button = Gtk.Button()
         self.button.set_label("✕")
         self.button.connect("clicked", self.on_close_clicked)
         
-        # Fixed CSS without transform property
+        # Style the button
         css = b"""
         window {
             background: transparent;
         }
         button {
-            background: rgba(220, 20, 20, 0.9);
+            background: rgba(220, 20, 20, 0.95);
             color: white;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
-            border: 3px solid white;
-            border-radius: 40px;
-            min-width: 80px;
-            min-height: 80px;
+            border: 2px solid white;
+            border-radius: 15px;
+            min-width: 70px;
+            min-height: 70px;
         }
         button:hover {
             background: rgba(255, 0, 0, 1.0);
-            border: 3px solid yellow;
+            border: 2px solid yellow;
         }
         """
         
@@ -103,45 +111,104 @@ class OverlayWindow(Gtk.Window):
         self.connect("enter-notify-event", self.on_mouse_enter)
         self.connect("leave-notify-event", self.on_mouse_leave)
         
-        # Show with full opacity initially
-        self.set_opacity(1.0)
+        # Set up mouse monitoring for corner detection
+        self.setup_corner_monitoring()
+        
         self.show_all()
-        
-        # Reserve space at top-left corner using strut (like a panel/dock)
-        self.setup_strut()
-        
-        # Keep on top but don't force focus aggressively
-        GLib.timeout_add(2000, self.ensure_on_top)  # Check every 2 seconds
-        
-        # Fade out after 3 seconds
-        GLib.timeout_add(3000, self.start_fade_out)
-        
-        print("Overlay window created and shown at full opacity", flush=True)
+        print("Sliding dock created and hidden", flush=True)
     
-    def setup_strut(self):
-        """Set up strut to reserve space like a dock/panel"""
+    def setup_corner_monitoring(self):
+        """Monitor mouse position for corner detection"""
+        self.corner_check_timer = GLib.timeout_add(100, self.check_corner_hover)
+    
+    def check_corner_hover(self):
+        """Check if mouse is in top-left corner"""
         try:
-            # Get the GDK window
-            gdk_window = self.get_window()
-            if gdk_window:
-                # Reserve 110x110 pixels at top-left corner
-                # Format: [left, right, top, bottom, left_start_y, left_end_y, right_start_y, right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x]
-                strut_partial = [0, 0, 110, 0, 0, 0, 0, 0, 0, 110, 0, 0]
-                strut = [0, 0, 110, 0]  # Simple version: [left, right, top, bottom]
-                
-                # Set both properties for compatibility
-                gdk_window.property_change("_NET_WM_STRUT_PARTIAL", "CARDINAL", 32, Gdk.PropMode.REPLACE, strut_partial)
-                gdk_window.property_change("_NET_WM_STRUT", "CARDINAL", 32, Gdk.PropMode.REPLACE, strut)
-                print("Strut properties set for dock-like behavior", flush=True)
+            display = Gdk.Display.get_default()
+            seat = display.get_default_seat()
+            pointer = seat.get_pointer()
+            screen, x, y, mask = pointer.get_position()
+            
+            # Top-left corner trigger area (50x50 pixels)
+            if x <= 50 and y <= 50:
+                if not self.is_visible:
+                    self.slide_in()
+            else:
+                # Only slide out if mouse is not over the dock itself
+                if self.is_visible and not self.is_mouse_over_dock():
+                    self.slide_out()
+        
         except Exception as e:
-            print(f"Failed to set strut: {e}", flush=True)
+            print(f"Corner check error: {e}", flush=True)
+        
+        return True  # Continue monitoring
     
-    def ensure_on_top(self):
-        """Gently ensure window stays on top without stealing focus"""
-        self.set_keep_above(True)
-        # Re-apply strut periodically to ensure it sticks
-        self.setup_strut()
-        return True  # Continue calling periodically
+    def is_mouse_over_dock(self):
+        """Check if mouse is over the dock window"""
+        try:
+            dock_window = self.get_window()
+            if dock_window:
+                screen, x, y, mask = dock_window.get_display().get_default_seat().get_pointer().get_position()
+                dock_x, dock_y = self.get_position()
+                dock_w, dock_h = self.get_size()
+                
+                return (dock_x <= x <= dock_x + dock_w and 
+                        dock_y <= y <= dock_y + dock_h)
+        except:
+            pass
+        return False
+    
+    def slide_in(self):
+        """Slide dock into view"""
+        if self.slide_timer:
+            GLib.source_remove(self.slide_timer)
+        
+        print("Sliding dock in...", flush=True)
+        self.is_visible = True
+        self.animate_to_position(self.visible_x, self.visible_y)
+    
+    def slide_out(self):
+        """Slide dock out of view"""
+        if self.slide_timer:
+            GLib.source_remove(self.slide_timer)
+        
+        print("Sliding dock out...", flush=True)
+        self.is_visible = False
+        self.animate_to_position(self.hidden_x, self.hidden_y)
+    
+    def animate_to_position(self, target_x, target_y):
+        """Smooth animation to target position"""
+        current_x, current_y = self.get_position()
+        
+        # Calculate animation steps
+        steps = 10
+        step_x = (target_x - current_x) / steps
+        step_y = (target_y - current_y) / steps
+        
+        self.animation_step = 0
+        self.animation_start_x = current_x
+        self.animation_start_y = current_y
+        self.animation_target_x = target_x
+        self.animation_target_y = target_y
+        self.animation_step_x = step_x
+        self.animation_step_y = step_y
+        
+        self.slide_timer = GLib.timeout_add(20, self.animation_tick)
+    
+    def animation_tick(self):
+        """Animation frame update"""
+        self.animation_step += 1
+        
+        if self.animation_step <= 10:
+            new_x = int(self.animation_start_x + (self.animation_step_x * self.animation_step))
+            new_y = int(self.animation_start_y + (self.animation_step_y * self.animation_step))
+            self.move(new_x, new_y)
+            return True  # Continue animation
+        else:
+            # Ensure final position is exact
+            self.move(int(self.animation_target_x), int(self.animation_target_y))
+            self.slide_timer = None
+            return False  # Stop animation
     
     def on_draw(self, widget, cr):
         """Make window background transparent"""
@@ -150,53 +217,26 @@ class OverlayWindow(Gtk.Window):
         cr.paint()
         return False
     
-    def start_fade_out(self):
-        """Start gradual fade out animation"""
-        print("Starting fade out animation", flush=True)
-        self.fade_step = 0
-        self.fade_timer = GLib.timeout_add(200, self.fade_step_out)  # Slower fade steps
-        return False
-    
-    def fade_step_out(self):
-        """Gradually fade out"""
-        self.fade_step += 1
-        new_opacity = max(0.2, 1.0 - (self.fade_step * 0.15))  # Fade to 20% instead of 30%
-        self.set_opacity(new_opacity)
-        print(f"Fade step {self.fade_step}, opacity: {new_opacity:.2f}", flush=True)
-        
-        if new_opacity <= 0.2:
-            print(f"Fade complete at opacity: {new_opacity:.2f}", flush=True)
-            return False  # Stop the animation
-        
-        return True  # Continue fading
-    
     def on_mouse_enter(self, widget, event):
-        """Show full opacity on hover"""
-        self.set_opacity(1.0)
-        print("Mouse enter - full opacity", flush=True)
+        """Mouse entered dock area"""
+        print("Mouse entered dock", flush=True)
         return False
     
     def on_mouse_leave(self, widget, event):
-        """Return to low opacity when mouse leaves"""
-        self.set_opacity(0.2)  # Match the faded opacity
-        print("Mouse leave - low opacity", flush=True)
+        """Mouse left dock area"""
+        print("Mouse left dock", flush=True)
         return False
     
     def on_close_clicked(self, button):
         print("=== CLOSE BUTTON CLICKED ===", flush=True)
-        print("About to kill Firefox and Stremio processes...", flush=True)
+        print("Closing Firefox and Stremio...", flush=True)
         
-        # Kill Firefox processes aggressively
+        # Kill applications
         subprocess.run(['pkill', '-f', 'firefox.*kiosk'], capture_output=True)
         subprocess.run(['pkill', 'firefox'], capture_output=True)
-        subprocess.run(['killall', 'firefox'], capture_output=True)
-        
-        # Kill Stremio processes
         subprocess.run(['pkill', 'stremio'], capture_output=True)
-        subprocess.run(['killall', 'stremio'], capture_output=True)
         
-        print("All kill commands completed, quitting overlay...", flush=True)
-        print("=== OVERLAY QUITTING ===", flush=True)
+        print("Applications closed, quitting dock...", flush=True)
         Gtk.main_quit()
 
 def signal_handler(sig, frame):
@@ -207,13 +247,13 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-print("Starting overlay application...", flush=True)
+print("Starting sliding dock application...", flush=True)
 
-# Create and run overlay
+# Create and run sliding dock
 try:
-    app = OverlayWindow()
+    dock = SlidingDock()
     Gtk.main()
-    print("GTK main loop ended", flush=True)
+    print("Sliding dock ended", flush=True)
 except Exception as e:
     print(f"Error: {e}", flush=True)
     sys.exit(1)

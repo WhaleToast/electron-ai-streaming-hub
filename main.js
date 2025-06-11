@@ -103,13 +103,13 @@ class OverlayWindow(Gtk.Window):
         self.set_opacity(1.0)
         self.show_all()
         
-        # Force to top every second
+        # Force to top every half second
         GLib.timeout_add(500, self.force_to_top)
         
-        # Fade out after 3 seconds
-        GLib.timeout_add(3000, self.fade_out)
+        # Fade out after 4 seconds (give more time to see it)
+        GLib.timeout_add(4000, self.start_fade_out)
         
-        print("Overlay window created and shown", flush=True)
+        print("Overlay window created and shown at full opacity", flush=True)
     
     def force_to_top(self):
         """Aggressively keep window on top"""
@@ -125,11 +125,24 @@ class OverlayWindow(Gtk.Window):
         cr.paint()
         return False
     
-    def fade_out(self):
-        """Fade to low opacity after delay"""
-        self.set_opacity(0.3)
-        print("Faded to low opacity", flush=True)
+    def start_fade_out(self):
+        """Start gradual fade out animation"""
+        print("Starting fade out animation", flush=True)
+        self.fade_step = 0
+        GLib.timeout_add(100, self.fade_step_out)
         return False
+    
+    def fade_step_out(self):
+        """Gradually fade out"""
+        self.fade_step += 1
+        new_opacity = max(0.3, 1.0 - (self.fade_step * 0.1))
+        self.set_opacity(new_opacity)
+        
+        if new_opacity <= 0.3:
+            print(f"Faded to final opacity: {new_opacity}", flush=True)
+            return False  # Stop the animation
+        
+        return True  # Continue fading
     
     def on_mouse_enter(self, widget, event):
         """Show full opacity on hover"""
@@ -147,7 +160,8 @@ class OverlayWindow(Gtk.Window):
         print("Close button clicked, killing Firefox...", flush=True)
         subprocess.run(['pkill', 'firefox'])
         print("Firefox killed, quitting overlay", flush=True)
-        Gtk.main_quit()
+        # Add small delay before quitting to ensure clean shutdown
+        GLib.timeout_add(100, lambda: Gtk.main_quit())
 
 def signal_handler(sig, frame):
     print("Signal received, quitting...", flush=True)
@@ -197,16 +211,12 @@ function showCornerOverlay() {
   
   overlayProcess.on('error', (error) => {
     console.error('Failed to start GTK overlay:', error);
-    console.log('Falling back to xterm overlay...');
-    fallbackOverlay();
   });
   
   overlayProcess.on('exit', (code) => {
     console.log('Overlay process exited with code:', code);
-    if (code !== 0) {
-      console.log('GTK overlay failed, using xterm fallback...');
-      fallbackOverlay();
-    }
+    // Don't restart Firefox when overlay exits - this was causing the relaunch
+    overlayProcess = null;
   });
 }
 
@@ -272,19 +282,22 @@ function hideCornerOverlay() {
 function closeFirefoxAndFocusMain() {
   console.log('Closing Firefox and returning to main window');
   
-  hideCornerOverlay();
-  
-  // Kill all Firefox processes
+  // Kill Firefox first
   exec('pkill firefox', (error) => {
     if (error) {
       console.log('No Firefox processes to kill or error occurred');
     }
     
-    // Bring main window to focus
-    if (mainWindow) {
-      mainWindow.focus();
-      mainWindow.show();
-    }
+    // Then hide overlay
+    hideCornerOverlay();
+    
+    // Finally bring main window to focus
+    setTimeout(() => {
+      if (mainWindow) {
+        mainWindow.focus();
+        mainWindow.show();
+      }
+    }, 200);
   });
 }
 

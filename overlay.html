@@ -2,23 +2,65 @@
 <html>
 <head>
     <style>
-        body {
+        html, body {
             margin: 0;
             background: transparent;
+            overflow: hidden;
         }
-        button {
-            font-size: 1rem;
-            padding: 0.5rem 1rem;
+
+        #back-button {
+            position: fixed;
+            top: 1rem;
+            left: -120px;
+            transition: left 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
             background: rgba(0, 0, 0, 0.6);
             color: white;
             border: none;
+            padding: 0.7rem 1rem;
             border-radius: 6px;
+            font-size: 1rem;
             cursor: pointer;
+            z-index: 9999;
+        }
+
+        #back-button.show {
+            left: 1rem;
+            opacity: 1;
         }
     </style>
 </head>
 <body>
-    <button onclick="window.overlayAPI.backToHome()">Back</button>
+    <button id="back-button">Back</button>
+
+    <script>
+        const button = document.getElementById('back-button');
+        let visible = false;
+        let hideTimer;
+
+        function showButton() {
+            if (!visible) {
+                visible = true;
+                button.classList.add('show');
+            }
+
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+                visible = false;
+                button.classList.remove('show');
+            }, 2000);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (e.clientX < 100 && e.clientY < 100) {
+                showButton();
+            }
+        });
+
+        button.addEventListener('click', () => {
+            window.overlayAPI.backToHome();
+        });
+    </script>
 </body>
 </html>
 

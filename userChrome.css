@@ -1,0 +1,119 @@
+/* 
+ * Firefox userChrome.css for Kiosk Mode
+ * This file goes in: ~/.mozilla/firefox/[profile]/chrome/userChrome.css
+ * Adds floating navigation controls that work on ALL websites
+ */
+
+/* Enable userChrome customizations */
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* Hide default Firefox UI elements in kiosk mode */
+#main-window[sizemode="fullscreen"] #navigator-toolbox {
+  display: none !important;
+}
+
+#main-window[sizemode="fullscreen"] #sidebar-box {
+  display: none !important;
+}
+
+/* Create floating navigation overlay */
+#main-window[sizemode="fullscreen"] #browser {
+  position: relative !important;
+}
+
+#main-window[sizemode="fullscreen"] #browser::before {
+  content: "";
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100px !important;
+  height: 100px !important;
+  background: transparent !important;
+  z-index: 999999 !important;
+  pointer-events: none !important;
+}
+
+/* Floating control panel */
+#main-window[sizemode="fullscreen"] #browser::after {
+  content: "🏠 ← → ⟲ ✕" !important;
+  position: fixed !important;
+  top: 10px !important;
+  left: 10px !important;
+  right: 10px !important;
+  height: 50px !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  border-radius: 25px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 20px !important;
+  font-weight: bold !important;
+  z-index: 999999 !important;
+  opacity: 0 !important;
+  transition: opacity 0.3s ease !important;
+  pointer-events: none !important;
+  letter-spacing: 20px !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* Show controls on hover over top area */
+#main-window[sizemode="fullscreen"] #browser:hover::after {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Custom navigation buttons container */
+#kiosk-nav-container {
+  position: fixed !important;
+  top: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+  border-radius: 30px !important;
+  padding: 10px 20px !important;
+  display: flex !important;
+  gap: 15px !important;
+  opacity: 0 !important;
+  transition: opacity 0.3s ease !important;
+  z-index: 999999 !important;
+  pointer-events: none !important;
+}
+
+#kiosk-nav-container.show {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.kiosk-nav-btn {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 20px !important;
+  padding: 8px 16px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+}
+
+.kiosk-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+.kiosk-nav-btn.home {
+  background: #e94560 !important;
+}
+
+.kiosk-nav-btn.home:hover {
+  background: #c73650 !important;
+}
+
+.kiosk-nav-btn.close {
+  background: #dc2626 !important;
+}
+
+.kiosk-nav-btn.close:hover {
+  background: #b91c1c !important;
+}

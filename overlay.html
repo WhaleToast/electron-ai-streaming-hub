@@ -11,10 +11,10 @@
         #back-button {
             position: fixed;
             top: 1rem;
-            left: -120px;
+            left: -10px;
             transition: left 0.3s ease, opacity 0.3s ease;
             opacity: 0;
-            background: rgba(0, 0, 0, 0.0);
+            background: rgba(0, 0, 0, 0.2);
             color: white;
             border: none;
             padding: 0.7rem 1rem;
@@ -42,7 +42,6 @@
             if (!visible) {
                 visible = true;
                 button.classList.add('show');
-                element.style.backgroundColor = black;
             }
 
             clearTimeout(hideTimer);
@@ -53,7 +52,7 @@
         }
 
         document.addEventListener('mousemove', (e) => {
-            if (e.clientX < 100 && e.clientY < 100) {
+            if (e.clientX < 10 && e.clientY < 10) {
                 showButton();
             }
         });

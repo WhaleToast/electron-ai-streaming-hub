@@ -340,45 +340,43 @@ function launchStremioFullscreen() {
       return;
     }
     
-    // Simple approach: just launch stremio
+    // Launch Stremio using spawn (non-blocking)
     const command = 'DISPLAY=:0 stremio';
     console.log('Executing:', command);
     
-    exec(command, (error, stdout, stderr) => {
-      console.log('=== STREMIO EXEC CALLBACK ===');
-      console.log('Error:', error);
-      console.log('Stdout:', stdout);
-      console.log('Stderr:', stderr);
-      
-      // Check if Stremio should still be running before handling errors
-      if (!stremioLaunched) {
-        console.log('Stremio was killed by user, ignoring exec callback');
-        return;
-      }
-      
-      if (error) {
-        console.log('Stremio failed to launch:', error.message);
-        // Try flatpak version
-        console.log('Trying flatpak version...');
-        exec('DISPLAY=:0 flatpak run com.stremio.Stremio', (flatpakError) => {
-          if (!stremioLaunched) {
-            console.log('Stremio was killed by user, ignoring flatpak callback');
-            return;
-          }
-          
-          if (flatpakError) {
-            console.error('Flatpak Stremio also failed:', flatpakError.message);
-            hideCornerOverlay();
-          } else {
-            console.log('Flatpak Stremio launched successfully');
-            attemptFullscreen();
-          }
-        });
-      } else {
-        console.log('Regular Stremio launched successfully');
-        attemptFullscreen();
-      }
+    // Use spawn instead of exec for GUI applications
+    const stremioProcess = spawn('stremio', [], {
+      env: { ...process.env, DISPLAY: ':0' },
+      detached: true,
+      stdio: 'ignore'
     });
+    
+    stremioProcess.on('error', (error) => {
+      console.log('Stremio spawn error:', error.message);
+      // Try flatpak version
+      console.log('Trying flatpak version...');
+      const flatpakProcess = spawn('flatpak', ['run', 'com.stremio.Stremio'], {
+        env: { ...process.env, DISPLAY: ':0' },
+        detached: true,
+        stdio: 'ignore'
+      });
+      
+      flatpakProcess.on('error', (flatpakError) => {
+        console.error('Flatpak Stremio also failed:', flatpakError.message);
+        hideCornerOverlay();
+      });
+      
+      flatpakProcess.on('spawn', () => {
+        console.log('Flatpak Stremio spawned successfully');
+        attemptFullscreen();
+      });
+    });
+    
+    stremioProcess.on('spawn', () => {
+      console.log('Regular Stremio spawned successfully');
+      attemptFullscreen();
+    });
+    
   }, 1000);
   
   function attemptFullscreen() {
@@ -402,57 +400,62 @@ function launchStremioFullscreen() {
         console.log('xdotool found, attempting to make Stremio fullscreen...');
         
         // First, let's see what windows are available
-        exec('xdotool search --onlyvisible ""', (searchError, searchOutput) => {
+        exec('xdotool search --onlyvisible --name "Stremio"', (searchError, searchOutput) => {
           if (searchError) {
-            console.log('Could not search for windows:', searchError.message);
+            console.log('Could not find Stremio window by name, trying class...');
+            
+            exec('xdotool search --onlyvisible --class "stremio"', (classError, classOutput) => {
+              if (classError) {
+                console.log('Could not find Stremio by class either. Listing all windows...');
+                exec('xdotool search --onlyvisible ""', (allError, allOutput) => {
+                  console.log('All visible windows:', allOutput);
+                });
+                return;
+              }
+              
+              console.log('Found Stremio window by class:', classOutput);
+              sendF11ToWindow(classOutput.trim());
+            });
             return;
           }
           
-          console.log('Available windows:', searchOutput);
-          
-          // Try to find and activate Stremio window
-          exec('xdotool search --sync --onlyvisible --class "stremio" windowactivate', (activateError) => {
-            if (activateError) {
-              console.log('Could not find Stremio window by class, trying by name...');
-              
-              exec('xdotool search --sync --onlyvisible --name "Stremio" windowactivate', (nameError) => {
-                if (nameError) {
-                  console.log('Could not find Stremio window by name either');
-                  console.log('Available window names:');
-                  exec('xdotool search --onlyvisible "" getwindowname %@', (nameListError, nameList) => {
-                    console.log(nameList || 'Could not get window names');
-                  });
-                  return;
-                }
-                
-                console.log('Found Stremio window by name, sending F11...');
-                sendF11ToActiveWindow();
-              });
-              return;
-            }
-            
-            console.log('Found Stremio window by class, sending F11...');
-            sendF11ToActiveWindow();
-          });
+          console.log('Found Stremio window by name:', searchOutput);
+          sendF11ToWindow(searchOutput.trim());
         });
       });
-    }, 4000); // Wait 4 seconds for Stremio to fully load
+    }, 5000); // Wait 5 seconds for Stremio to fully load
   }
   
-  function sendF11ToActiveWindow() {
-    exec('xdotool key F11', (f11Error) => {
-      if (f11Error) {
-        console.log('F11 failed, trying "f" key...');
-        exec('xdotool key f', (fError) => {
-          if (fError) {
-            console.log('Both F11 and f keys failed:', fError.message);
-          } else {
-            console.log('Successfully sent "f" key for fullscreen');
-          }
-        });
-      } else {
-        console.log('Successfully sent F11 key for fullscreen');
+  function sendF11ToWindow(windowId) {
+    if (!windowId) {
+      console.log('No window ID provided');
+      return;
+    }
+    
+    console.log(`Sending F11 to window ID: ${windowId}`);
+    
+    // First activate the window, then send F11
+    exec(`xdotool windowactivate ${windowId}`, (activateError) => {
+      if (activateError) {
+        console.log('Could not activate window:', activateError.message);
+        return;
       }
+      
+      console.log('Window activated, sending F11...');
+      exec(`xdotool key --window ${windowId} F11`, (f11Error) => {
+        if (f11Error) {
+          console.log('F11 failed, trying "f" key...');
+          exec(`xdotool key --window ${windowId} f`, (fError) => {
+            if (fError) {
+              console.log('Both F11 and f keys failed:', fError.message);
+            } else {
+              console.log('Successfully sent "f" key for fullscreen');
+            }
+          });
+        } else {
+          console.log('Successfully sent F11 key for fullscreen');
+        }
+      });
     });
   }
 }

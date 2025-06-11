@@ -36,7 +36,7 @@ class StreamingLauncher {
             },
             stremio: {
                 name: 'Stremio',
-                command: ['stremio', '--fullscreen'],
+                command: ['stremio'],
                 processName: 'stremio',
                 icon: '🎯',
                 postLaunch: 'fullscreen'

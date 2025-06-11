@@ -37,7 +37,7 @@ class OverlayWindow(Gtk.Window):
         
         print("Creating overlay window...", flush=True)
         
-        # Window setup - stay on top but don't steal focus
+        # Window setup - DOCK type with strut to stay above fullscreen apps
         self.set_title("Close Firefox")
         self.set_default_size(100, 100)
         self.set_resizable(False)
@@ -48,7 +48,7 @@ class OverlayWindow(Gtk.Window):
         self.set_accept_focus(False)  # This prevents stealing focus!
         self.set_focus_on_map(False)  # Don't take focus when shown
         
-        # Use DOCK type hint - stays on top but doesn't interfere
+        # Use DOCK type hint - critical for staying above fullscreen
         self.set_type_hint(Gdk.WindowTypeHint.DOCK)
         
         # Position in top-left corner
@@ -107,18 +107,40 @@ class OverlayWindow(Gtk.Window):
         self.set_opacity(1.0)
         self.show_all()
         
+        # Reserve space at top-left corner using strut (like a panel/dock)
+        self.setup_strut()
+        
         # Keep on top but don't force focus aggressively
-        GLib.timeout_add(2000, self.ensure_on_top)  # Check every 2 seconds, not every 500ms
+        GLib.timeout_add(2000, self.ensure_on_top)  # Check every 2 seconds
         
         # Fade out after 3 seconds
         GLib.timeout_add(3000, self.start_fade_out)
         
         print("Overlay window created and shown at full opacity", flush=True)
     
+    def setup_strut(self):
+        """Set up strut to reserve space like a dock/panel"""
+        try:
+            # Get the GDK window
+            gdk_window = self.get_window()
+            if gdk_window:
+                # Reserve 110x110 pixels at top-left corner
+                # Format: [left, right, top, bottom, left_start_y, left_end_y, right_start_y, right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x]
+                strut_partial = [0, 0, 110, 0, 0, 0, 0, 0, 0, 110, 0, 0]
+                strut = [0, 0, 110, 0]  # Simple version: [left, right, top, bottom]
+                
+                # Set both properties for compatibility
+                gdk_window.property_change("_NET_WM_STRUT_PARTIAL", "CARDINAL", 32, Gdk.PropMode.REPLACE, strut_partial)
+                gdk_window.property_change("_NET_WM_STRUT", "CARDINAL", 32, Gdk.PropMode.REPLACE, strut)
+                print("Strut properties set for dock-like behavior", flush=True)
+        except Exception as e:
+            print(f"Failed to set strut: {e}", flush=True)
+    
     def ensure_on_top(self):
         """Gently ensure window stays on top without stealing focus"""
         self.set_keep_above(True)
-        # Don't call present() or raise_() - these steal focus
+        # Re-apply strut periodically to ensure it sticks
+        self.setup_strut()
         return True  # Continue calling periodically
     
     def on_draw(self, widget, cr):

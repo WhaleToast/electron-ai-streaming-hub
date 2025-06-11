@@ -6,6 +6,7 @@ const fs = require('fs');
 let mainWindow = null;
 let overlayProcess = null;
 let firefoxLaunched = false; // Track if Firefox is supposed to be running
+let stremioLaunched = false; // Track if Stremio is supposed to be running
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -159,12 +160,16 @@ class OverlayWindow(Gtk.Window):
     
     def on_close_clicked(self, button):
         print("=== CLOSE BUTTON CLICKED ===", flush=True)
-        print("About to kill Firefox processes...", flush=True)
+        print("About to kill Firefox and Stremio processes...", flush=True)
         
         # Kill Firefox processes aggressively
         subprocess.run(['pkill', '-f', 'firefox.*kiosk'], capture_output=True)
         subprocess.run(['pkill', 'firefox'], capture_output=True)
         subprocess.run(['killall', 'firefox'], capture_output=True)
+        
+        # Kill Stremio processes
+        subprocess.run(['pkill', 'stremio'], capture_output=True)
+        subprocess.run(['killall', 'stremio'], capture_output=True)
         
         print("All kill commands completed, quitting overlay...", flush=True)
         print("=== OVERLAY QUITTING ===", flush=True)
@@ -224,11 +229,12 @@ function showCornerOverlay() {
   overlayProcess.on('exit', (code) => {
     console.log('=== OVERLAY PROCESS EXITED ===');
     console.log('Exit code:', code);
-    console.log('Setting firefoxLaunched to false');
+    console.log('Setting all launch flags to false');
     overlayProcess = null;
     
-    // Set flag that Firefox should NOT be running
+    // Set flags that nothing should be running
     firefoxLaunched = false;
+    stremioLaunched = false;
     
     // Focus main window when overlay exits (user clicked X)
     setTimeout(() => {
@@ -253,8 +259,9 @@ function hideCornerOverlay() {
   // Clean up any remaining overlay processes
   exec('pkill -f corner_overlay.py');
   
-  // Set flag that Firefox should NOT be running
+  // Set flags that nothing should be running
   firefoxLaunched = false;
+  stremioLaunched = false;
 }
 
 function launchFirefoxInKioskMode(url) {
@@ -312,6 +319,70 @@ function launchFirefoxInKioskMode(url) {
   }, 1000);
 }
 
+function launchStremioFullscreen() {
+  console.log(`=== LAUNCH STREMIO CALLED ===`);
+  console.log(`stremioLaunched flag: ${stremioLaunched}`);
+  
+  // Set flag that Stremio is supposed to be running
+  stremioLaunched = true;
+  
+  // Start overlay BEFORE Stremio
+  showCornerOverlay();
+  
+  // Wait a moment then launch Stremio
+  setTimeout(() => {
+    console.log(`=== ABOUT TO LAUNCH STREMIO ===`);
+    console.log(`stremioLaunched flag is now: ${stremioLaunched}`);
+    
+    // Double-check that we still want to launch Stremio
+    if (!stremioLaunched) {
+      console.log('Stremio launch cancelled due to flag');
+      return;
+    }
+    
+    // Try different ways to launch Stremio in fullscreen
+    const stremioCommands = [
+      'DISPLAY=:0 stremio --fullscreen',
+      'DISPLAY=:0 stremio',
+      'DISPLAY=:0 /usr/bin/stremio --fullscreen',
+      'DISPLAY=:0 flatpak run com.stremio.Stremio'
+    ];
+    
+    function tryStremioCommand(commandIndex) {
+      if (commandIndex >= stremioCommands.length) {
+        console.error('All Stremio launch attempts failed');
+        hideCornerOverlay();
+        return;
+      }
+      
+      if (!stremioLaunched) {
+        console.log('Stremio was cancelled, stopping launch attempts');
+        return;
+      }
+      
+      const command = stremioCommands[commandIndex];
+      console.log(`Trying Stremio command ${commandIndex + 1}:`, command);
+      
+      exec(command, (error) => {
+        // Check if Stremio should still be running before handling errors
+        if (!stremioLaunched) {
+          console.log('Stremio was killed by user, ignoring exec callback');
+          return;
+        }
+        
+        if (error) {
+          console.log(`Stremio command ${commandIndex + 1} failed, trying next...`);
+          tryStremioCommand(commandIndex + 1);
+        } else {
+          console.log('Stremio launched successfully');
+        }
+      });
+    }
+    
+    tryStremioCommand(0);
+  }, 1000);
+}
+
 app.whenReady().then(createWindow);
 
 // Handle requests from the UI to launch apps/URLs
@@ -319,23 +390,31 @@ ipcMain.on('launch', (event, data) => {
   if (data.type === 'url') {
     launchFirefoxInKioskMode(data.target);
   } else if (data.type === 'app') {
-    exec(data.target, (error) => {
-      if (error) {
-        console.error(`Error launching ${data.target}:`, error);
-      }
-    });
+    if (data.target === 'stremio') {
+      launchStremioFullscreen();
+    } else {
+      // For other apps, launch normally without overlay
+      exec(data.target, (error) => {
+        if (error) {
+          console.error(`Error launching ${data.target}:`, error);
+        }
+      });
+    }
   }
 });
 
 // Clean up on app quit
 app.on('before-quit', () => {
   firefoxLaunched = false;
+  stremioLaunched = false;
   hideCornerOverlay();
   exec('pkill firefox');
+  exec('pkill stremio');
 });
 
 app.on('window-all-closed', () => {
   firefoxLaunched = false;
+  stremioLaunched = false;
   hideCornerOverlay();
   if (process.platform !== 'darwin') {
     app.quit();

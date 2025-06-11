@@ -8,8 +8,6 @@ I added ---- in this README where I actually wrote something and not the AI.
 
 A modern, mouse-controlled streaming launcher built with Electron for Arch Linux + Openbox. Perfect for converting your ----old computer---- into a dedicated streaming box.
 
-![Streaming Launcher](https://via.placeholder.com/800x450/0a0e1a/ffffff?text=Modern+Streaming+Interface)
-
 ## ✨ Features
 
 - **Mouse-Only Control**: Designed specifically for TV/couch use with large, clickable tiles

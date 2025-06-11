@@ -120,7 +120,7 @@ class StreamingLauncher {
         console.log(`Launching ${service.name}...`);
 
         try {
-            this.mainWindow.hide();
+            // this.mainWindow.hide();
             this.overlayWindow.show();
 
             if (service.processName === 'firefox') {

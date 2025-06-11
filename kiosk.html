@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Center</title>
+    <style>
+        :root {
+            --primary: #1a1a2e;
+            --secondary: #16213e;
+            --accent: #e94560;
+            --text: #ffffff;
+            --text-dim: #b0b0b0;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-4: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 300;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #fff, #b0b0b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-dim);
+            font-size: 1.2rem;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .app-card {
+            background: var(--secondary);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1;
+        }
+
+        .app-card:nth-child(2)::before {
+            background: var(--gradient-2);
+        }
+
+        .app-card:nth-child(3)::before {
+            background: var(--gradient-3);
+        }
+
+        .app-card:nth-child(4)::before {
+            background: var(--gradient-4);
+        }
+
+        .app-card:hover::before {
+            opacity: 0.1;
+        }
+
+        .app-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .app-card * {
+            position: relative;
+            z-index: 2;
+        }
+
+        .app-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .app-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .app-description {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .close-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+        }
+
+        .close-button:hover {
+            background: #c73650;
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 2000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            font-size: 1.2rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .app-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .app-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Media Center</h1>
+        <p>Choose your streaming platform</p>
+    </div>
+
+    <div class="main-content">
+        <div class="app-grid">
+            <div class="app-card" data-url="https://www.netflix.com">
+                <div class="app-icon">🎬</div>
+                <div class="app-name">Netflix</div>
+                <div class="app-description">Watch movies, TV shows and Netflix originals</div>
+            </div>
+
+            <div class="app-card" data-url="https://www.youtube.com">
+                <div class="app-icon">📺</div>
+                <div class="app-name">YouTube</div>
+                <div class="app-description">Videos, music, and live streams</div>
+            </div>
+
+            <div class="app-card" data-app="stremio">
+                <div class="app-icon">🎭</div>
+                <div class="app-name">Stremio</div>
+                <div class="app-description">Movies and TV shows from various sources</div>
+            </div>
+
+            <div class="app-card" data-url="https://www.disneyplus.com">
+                <div class="app-icon">🏰</div>
+                <div class="app-name">Disney+</div>
+                <div class="app-description">Disney, Marvel, Star Wars, and more</div>
+            </div>
+
+            <div class="app-card" data-url="https://www.primevideo.com">
+                <div class="app-icon">📦</div>
+                <div class="app-name">Prime Video</div>
+                <div class="app-description">Amazon's streaming service</div>
+            </div>
+
+            <div class="app-card" data-url="https://www.hbomax.com">
+                <div class="app-icon">🎪</div>
+                <div class="app-name">HBO Max</div>
+                <div class="app-description">Premium movies and series</div>
+            </div>
+        </div>
+    </div>
+
+    <button class="close-button" onclick="closeKiosk()" title="Exit Kiosk Mode">✕</button>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+
+    <script>
+        // Handle app launching
+        document.querySelectorAll('.app-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const url = this.dataset.url;
+                const app = this.dataset.app;
+                
+                showLoading();
+                
+                if (url) {
+                    // Launch web app in new window/tab
+                    setTimeout(() => {
+                        window.open(url, '_blank');
+                        hideLoading();
+                    }, 1000);
+                } else if (app === 'stremio') {
+                    // For Stremio, we'd need a backend service to launch it
+                    // For now, just show a message
+                    alert('Stremio launching would require a backend service');
+                    hideLoading();
+                }
+            });
+        });
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function closeKiosk() {
+            if (confirm('Exit Media Center?')) {
+                // In a real kiosk, this would communicate with the system
+                window.close();
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // ESC to close
+            if (e.key === 'Escape') {
+                closeKiosk();
+            }
+            
+            // Number keys to select apps
+            const num = parseInt(e.key);
+            if (num >= 1 && num <= 6) {
+                const cards = document.querySelectorAll('.app-card');
+                if (cards[num - 1]) {
+                    cards[num - 1].click();
+                }
+            }
+        });
+
+        // Prevent right-click context menu in kiosk mode
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Prevent F12, Ctrl+Shift+I, etc. in kiosk mode
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'C') ||
+                (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

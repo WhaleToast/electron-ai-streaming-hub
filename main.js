@@ -340,80 +340,121 @@ function launchStremioFullscreen() {
       return;
     }
     
-    // Try different ways to launch Stremio
-    const stremioCommands = [
-      'DISPLAY=:0 stremio',
-      'DISPLAY=:0 /usr/bin/stremio',
-      'DISPLAY=:0 flatpak run com.stremio.Stremio'
-    ];
+    // Simple approach: just launch stremio
+    const command = 'DISPLAY=:0 stremio';
+    console.log('Executing:', command);
     
-    function tryStremioCommand(commandIndex) {
-      if (commandIndex >= stremioCommands.length) {
-        console.error('All Stremio launch attempts failed');
-        hideCornerOverlay();
-        return;
-      }
+    exec(command, (error, stdout, stderr) => {
+      console.log('=== STREMIO EXEC CALLBACK ===');
+      console.log('Error:', error);
+      console.log('Stdout:', stdout);
+      console.log('Stderr:', stderr);
       
+      // Check if Stremio should still be running before handling errors
       if (!stremioLaunched) {
-        console.log('Stremio was cancelled, stopping launch attempts');
+        console.log('Stremio was killed by user, ignoring exec callback');
         return;
       }
       
-      const command = stremioCommands[commandIndex];
-      console.log(`Trying Stremio command ${commandIndex + 1}:`, command);
+      if (error) {
+        console.log('Stremio failed to launch:', error.message);
+        // Try flatpak version
+        console.log('Trying flatpak version...');
+        exec('DISPLAY=:0 flatpak run com.stremio.Stremio', (flatpakError) => {
+          if (!stremioLaunched) {
+            console.log('Stremio was killed by user, ignoring flatpak callback');
+            return;
+          }
+          
+          if (flatpakError) {
+            console.error('Flatpak Stremio also failed:', flatpakError.message);
+            hideCornerOverlay();
+          } else {
+            console.log('Flatpak Stremio launched successfully');
+            attemptFullscreen();
+          }
+        });
+      } else {
+        console.log('Regular Stremio launched successfully');
+        attemptFullscreen();
+      }
+    });
+  }, 1000);
+  
+  function attemptFullscreen() {
+    console.log('=== ATTEMPTING FULLSCREEN ===');
+    
+    // Wait for Stremio to fully load, then try to make it fullscreen
+    setTimeout(() => {
+      if (!stremioLaunched) {
+        console.log('Stremio was killed, skipping fullscreen attempt');
+        return;
+      }
       
-      exec(command, (error) => {
-        // Check if Stremio should still be running before handling errors
-        if (!stremioLaunched) {
-          console.log('Stremio was killed by user, ignoring exec callback');
+      console.log('Checking if xdotool is available...');
+      exec('which xdotool', (whichError) => {
+        if (whichError) {
+          console.log('xdotool not installed. Please install with: sudo pacman -S xdotool');
+          console.log('For now, you can manually press F11 to make Stremio fullscreen');
           return;
         }
         
-        if (error) {
-          console.log(`Stremio command ${commandIndex + 1} failed, trying next...`);
-          tryStremioCommand(commandIndex + 1);
-        } else {
-          console.log('Stremio launched successfully');
+        console.log('xdotool found, attempting to make Stremio fullscreen...');
+        
+        // First, let's see what windows are available
+        exec('xdotool search --onlyvisible ""', (searchError, searchOutput) => {
+          if (searchError) {
+            console.log('Could not search for windows:', searchError.message);
+            return;
+          }
           
-          // Send F11 key to make Stremio fullscreen after it loads
-          setTimeout(() => {
-            if (stremioLaunched) {
-              console.log('Attempting to make Stremio fullscreen with F11...');
+          console.log('Available windows:', searchOutput);
+          
+          // Try to find and activate Stremio window
+          exec('xdotool search --sync --onlyvisible --class "stremio" windowactivate', (activateError) => {
+            if (activateError) {
+              console.log('Could not find Stremio window by class, trying by name...');
               
-              // Try xdotool first (most reliable)
-              exec('xdotool search --sync --onlyvisible --class "stremio" windowactivate key F11', (xdoError) => {
-                if (xdoError) {
-                  console.log('xdotool failed, trying alternative approach...');
-                  
-                  // Try with window name instead of class
-                  exec('xdotool search --sync --name "Stremio" windowactivate key F11', (nameError) => {
-                    if (nameError) {
-                      console.log('Alternative xdotool failed, trying with "f" key...');
-                      
-                      // Try with lowercase 'f' key (also works for fullscreen in Stremio)
-                      exec('xdotool search --sync --name "Stremio" windowactivate key f', (fError) => {
-                        if (fError) {
-                          console.log('Could not auto-fullscreen Stremio. User can press F11 manually.');
-                        } else {
-                          console.log('Stremio fullscreen activated with "f" key');
-                        }
-                      });
-                    } else {
-                      console.log('Stremio fullscreen activated with F11');
-                    }
+              exec('xdotool search --sync --onlyvisible --name "Stremio" windowactivate', (nameError) => {
+                if (nameError) {
+                  console.log('Could not find Stremio window by name either');
+                  console.log('Available window names:');
+                  exec('xdotool search --onlyvisible "" getwindowname %@', (nameListError, nameList) => {
+                    console.log(nameList || 'Could not get window names');
                   });
-                } else {
-                  console.log('Stremio fullscreen activated with F11');
+                  return;
                 }
+                
+                console.log('Found Stremio window by name, sending F11...');
+                sendF11ToActiveWindow();
               });
+              return;
             }
-          }, 3000); // Wait 3 seconds for Stremio to fully load
-        }
+            
+            console.log('Found Stremio window by class, sending F11...');
+            sendF11ToActiveWindow();
+          });
+        });
       });
-    }
-    
-    tryStremioCommand(0);
-  }, 1000);
+    }, 4000); // Wait 4 seconds for Stremio to fully load
+  }
+  
+  function sendF11ToActiveWindow() {
+    exec('xdotool key F11', (f11Error) => {
+      if (f11Error) {
+        console.log('F11 failed, trying "f" key...');
+        exec('xdotool key f', (fError) => {
+          if (fError) {
+            console.log('Both F11 and f keys failed:', fError.message);
+          } else {
+            console.log('Successfully sent "f" key for fullscreen');
+          }
+        });
+      } else {
+        console.log('Successfully sent F11 key for fullscreen');
+      }
+    });
+  }
 }
 
 app.whenReady().then(createWindow);

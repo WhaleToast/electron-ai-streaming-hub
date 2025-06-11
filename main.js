@@ -340,15 +340,11 @@ function launchStremioFullscreen() {
       return;
     }
     
-    // Try different ways to launch Stremio in fullscreen
+    // Try different ways to launch Stremio
     const stremioCommands = [
-      // Try with window manager commands to force fullscreen
-      'DISPLAY=:0 stremio --fullscreen --kiosk',
-      'DISPLAY=:0 stremio --fullscreen',
-      'DISPLAY=:0 stremio --start-fullscreen',
       'DISPLAY=:0 stremio',
-      'DISPLAY=:0 /usr/bin/stremio --fullscreen',
-      'DISPLAY=:0 flatpak run com.stremio.Stremio --fullscreen'
+      'DISPLAY=:0 /usr/bin/stremio',
+      'DISPLAY=:0 flatpak run com.stremio.Stremio'
     ];
     
     function tryStremioCommand(commandIndex) {
@@ -379,33 +375,39 @@ function launchStremioFullscreen() {
         } else {
           console.log('Stremio launched successfully');
           
-          // Try to force fullscreen after launch with window manager commands
+          // Send F11 key to make Stremio fullscreen after it loads
           setTimeout(() => {
             if (stremioLaunched) {
-              console.log('Attempting to force Stremio fullscreen...');
+              console.log('Attempting to make Stremio fullscreen with F11...');
               
-              // Try various window manager commands to make Stremio fullscreen
-              exec('wmctrl -r "Stremio" -b add,fullscreen', (wmError) => {
-                if (wmError) {
-                  console.log('wmctrl not available, trying xdotool...');
+              // Try xdotool first (most reliable)
+              exec('xdotool search --sync --onlyvisible --class "stremio" windowactivate key F11', (xdoError) => {
+                if (xdoError) {
+                  console.log('xdotool failed, trying alternative approach...');
                   
-                  // Try with xdotool
-                  exec('xdotool search --name "Stremio" windowactivate --sync key F11', (xdoError) => {
-                    if (xdoError) {
-                      console.log('xdotool not available, trying openbox commands...');
+                  // Try with window name instead of class
+                  exec('xdotool search --sync --name "Stremio" windowactivate key F11', (nameError) => {
+                    if (nameError) {
+                      console.log('Alternative xdotool failed, trying with "f" key...');
                       
-                      // Try openbox-specific command
-                      exec('openbox --reconfigure && wmctrl -r "Stremio" -b toggle,fullscreen', (obError) => {
-                        if (obError) {
-                          console.log('Could not force fullscreen automatically');
+                      // Try with lowercase 'f' key (also works for fullscreen in Stremio)
+                      exec('xdotool search --sync --name "Stremio" windowactivate key f', (fError) => {
+                        if (fError) {
+                          console.log('Could not auto-fullscreen Stremio. User can press F11 manually.');
+                        } else {
+                          console.log('Stremio fullscreen activated with "f" key');
                         }
                       });
+                    } else {
+                      console.log('Stremio fullscreen activated with F11');
                     }
                   });
+                } else {
+                  console.log('Stremio fullscreen activated with F11');
                 }
               });
             }
-          }, 2000); // Wait 2 seconds for Stremio to fully load
+          }, 3000); // Wait 3 seconds for Stremio to fully load
         }
       });
     }

@@ -1,3 +1,8 @@
+#IF YOU FOUND THIS. BEWARE. THIS IS 99% VIBE CODED. PURE AI BABY
+I have tested and it works, but everything you see here is made by ChatGPT or Claude. I only made some small changes once everything was working.
+Honestly kinda crazy that it even works
+
+
 # 🎬 Streaming Launcher for Intel NUC
 
 A modern, mouse-controlled streaming launcher built with Electron for Arch Linux + Openbox. Perfect for converting your Intel NUC into a dedicated streaming box.

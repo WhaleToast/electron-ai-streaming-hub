@@ -37,7 +37,7 @@ class OverlayWindow(Gtk.Window):
         
         print("Creating overlay window...", flush=True)
         
-        # Window setup - aggressive about staying on top
+        # Window setup - stay on top but don't steal focus
         self.set_title("Close Firefox")
         self.set_default_size(100, 100)
         self.set_resizable(False)
@@ -45,8 +45,10 @@ class OverlayWindow(Gtk.Window):
         self.set_keep_above(True)
         self.set_skip_taskbar_hint(True)
         self.set_skip_pager_hint(True)
+        self.set_accept_focus(False)  # This prevents stealing focus!
+        self.set_focus_on_map(False)  # Don't take focus when shown
         
-        # Use DOCK type hint - this makes it stay on top of everything
+        # Use DOCK type hint - stays on top but doesn't interfere
         self.set_type_hint(Gdk.WindowTypeHint.DOCK)
         
         # Position in top-left corner
@@ -105,20 +107,19 @@ class OverlayWindow(Gtk.Window):
         self.set_opacity(1.0)
         self.show_all()
         
-        # Force to top every half second
-        GLib.timeout_add(500, self.force_to_top)
+        # Keep on top but don't force focus aggressively
+        GLib.timeout_add(2000, self.ensure_on_top)  # Check every 2 seconds, not every 500ms
         
-        # Fade out after 4 seconds (give more time to see it)
-        GLib.timeout_add(4000, self.start_fade_out)
+        # Fade out after 3 seconds
+        GLib.timeout_add(3000, self.start_fade_out)
         
         print("Overlay window created and shown at full opacity", flush=True)
     
-    def force_to_top(self):
-        """Aggressively keep window on top"""
+    def ensure_on_top(self):
+        """Gently ensure window stays on top without stealing focus"""
         self.set_keep_above(True)
-        self.present()
-        self.get_window().raise_()
-        return True  # Continue calling
+        # Don't call present() or raise_() - these steal focus
+        return True  # Continue calling periodically
     
     def on_draw(self, widget, cr):
         """Make window background transparent"""
@@ -131,17 +132,18 @@ class OverlayWindow(Gtk.Window):
         """Start gradual fade out animation"""
         print("Starting fade out animation", flush=True)
         self.fade_step = 0
-        GLib.timeout_add(100, self.fade_step_out)
+        self.fade_timer = GLib.timeout_add(200, self.fade_step_out)  # Slower fade steps
         return False
     
     def fade_step_out(self):
         """Gradually fade out"""
         self.fade_step += 1
-        new_opacity = max(0.3, 1.0 - (self.fade_step * 0.1))
+        new_opacity = max(0.2, 1.0 - (self.fade_step * 0.15))  # Fade to 20% instead of 30%
         self.set_opacity(new_opacity)
+        print(f"Fade step {self.fade_step}, opacity: {new_opacity:.2f}", flush=True)
         
-        if new_opacity <= 0.3:
-            print(f"Faded to final opacity: {new_opacity}", flush=True)
+        if new_opacity <= 0.2:
+            print(f"Fade complete at opacity: {new_opacity:.2f}", flush=True)
             return False  # Stop the animation
         
         return True  # Continue fading
@@ -154,7 +156,7 @@ class OverlayWindow(Gtk.Window):
     
     def on_mouse_leave(self, widget, event):
         """Return to low opacity when mouse leaves"""
-        self.set_opacity(0.3)
+        self.set_opacity(0.2)  # Match the faded opacity
         print("Mouse leave - low opacity", flush=True)
         return False
     
@@ -384,6 +386,8 @@ function launchStremioFullscreen() {
     
     // Wait for Stremio to fully load, then try to make it fullscreen
     setTimeout(() => {
+      console.log(`Checking stremioLaunched flag: ${stremioLaunched}`);
+      
       if (!stremioLaunched) {
         console.log('Stremio was killed, skipping fullscreen attempt');
         return;
@@ -397,33 +401,38 @@ function launchStremioFullscreen() {
           return;
         }
         
-        console.log('xdotool found, attempting to make Stremio fullscreen...');
+        console.log('xdotool found, searching for Stremio window...');
         
         // First, let's see what windows are available
         exec('xdotool search --onlyvisible --name "Stremio"', (searchError, searchOutput) => {
-          if (searchError) {
+          if (searchError || !searchOutput.trim()) {
             console.log('Could not find Stremio window by name, trying class...');
             
             exec('xdotool search --onlyvisible --class "stremio"', (classError, classOutput) => {
-              if (classError) {
+              if (classError || !classOutput.trim()) {
                 console.log('Could not find Stremio by class either. Listing all windows...');
                 exec('xdotool search --onlyvisible ""', (allError, allOutput) => {
                   console.log('All visible windows:', allOutput);
+                  
+                  // Also try to get window names to help debug
+                  exec('wmctrl -l', (wmError, wmOutput) => {
+                    console.log('wmctrl window list:', wmOutput);
+                  });
                 });
                 return;
               }
               
               console.log('Found Stremio window by class:', classOutput);
-              sendF11ToWindow(classOutput.trim());
+              sendF11ToWindow(classOutput.trim().split('\n')[0]); // Take first window ID
             });
             return;
           }
           
           console.log('Found Stremio window by name:', searchOutput);
-          sendF11ToWindow(searchOutput.trim());
+          sendF11ToWindow(searchOutput.trim().split('\n')[0]); // Take first window ID
         });
       });
-    }, 5000); // Wait 5 seconds for Stremio to fully load
+    }, 2000); // Reduced to 2 seconds - most apps load by then
   }
   
   function sendF11ToWindow(windowId) {

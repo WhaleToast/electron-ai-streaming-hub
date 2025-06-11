@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Launcher</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="title">
+                <span class="title-icon">🎬</span>
+                Streaming Hub
+            </h1>
+            <div class="time-display" id="time-display"></div>
+        </header>
+        
+        <main class="main-content">
+            <div class="services-grid" id="services-grid">
+                <!-- Services will be dynamically loaded here -->
+            </div>
+        </main>
+        
+        <footer class="footer">
+            <button class="control-btn settings-btn" id="settings-btn">
+                ⚙️ Settings
+            </button>
+            <button class="control-btn quit-btn" id="quit-btn">
+                ❌ Quit
+            </button>
+        </footer>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-btn" id="close-settings">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <h3>Display</h3>
+                    <label class="setting-item">
+                        <input type="checkbox" id="show-time" checked>
+                        <span>Show current time</span>
+                    </label>
+                    <label class="setting-item">
+                        <input type="checkbox" id="large-tiles" checked>
+                        <span>Large service tiles</span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <h3>Services</h3>
+                    <p class="setting-description">
+                        Services are automatically detected. Make sure applications are installed and accessible from PATH.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

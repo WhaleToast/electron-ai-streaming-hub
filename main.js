@@ -158,10 +158,12 @@ class OverlayWindow(Gtk.Window):
     
     def on_close_clicked(self, button):
         print("Close button clicked, killing Firefox...", flush=True)
+        # Be more aggressive about killing Firefox
+        subprocess.run(['pkill', '-f', 'firefox.*kiosk'])
         subprocess.run(['pkill', 'firefox'])
-        print("Firefox killed, quitting overlay", flush=True)
-        # Add small delay before quitting to ensure clean shutdown
-        GLib.timeout_add(100, lambda: Gtk.main_quit())
+        subprocess.run(['killall', 'firefox'], capture_output=True)  # Fallback
+        print("Firefox killed, quitting overlay immediately", flush=True)
+        Gtk.main_quit()
 
 def signal_handler(sig, frame):
     print("Signal received, quitting...", flush=True)
@@ -215,8 +217,16 @@ function showCornerOverlay() {
   
   overlayProcess.on('exit', (code) => {
     console.log('Overlay process exited with code:', code);
-    // Don't restart Firefox when overlay exits - this was causing the relaunch
     overlayProcess = null;
+    
+    // When overlay exits, focus main window (this happens when X button is clicked)
+    setTimeout(() => {
+      if (mainWindow) {
+        console.log('Overlay exited, focusing main window');
+        mainWindow.focus();
+        mainWindow.show();
+      }
+    }, 300);
   });
 }
 
@@ -280,25 +290,26 @@ function hideCornerOverlay() {
 }
 
 function closeFirefoxAndFocusMain() {
-  console.log('Closing Firefox and returning to main window');
+  console.log('Manual close: Closing Firefox and returning to main window');
   
-  // Kill Firefox first
+  // Hide overlay first to prevent any interference
+  hideCornerOverlay();
+  
+  // Kill Firefox
   exec('pkill firefox', (error) => {
     if (error) {
       console.log('No Firefox processes to kill or error occurred');
     }
-    
-    // Then hide overlay
-    hideCornerOverlay();
-    
-    // Finally bring main window to focus
-    setTimeout(() => {
-      if (mainWindow) {
-        mainWindow.focus();
-        mainWindow.show();
-      }
-    }, 200);
+    console.log('Firefox killed by manual close');
   });
+  
+  // Bring main window to focus after a short delay
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.focus();
+      mainWindow.show();
+    }
+  }, 500);
 }
 
 function launchFirefoxInKioskMode(url) {
@@ -307,13 +318,17 @@ function launchFirefoxInKioskMode(url) {
   // Start overlay BEFORE Firefox
   showCornerOverlay();
   
-  // Wait a moment then launch Firefox
+  // Wait a moment then launch Firefox with explicit display
   setTimeout(() => {
+    const firefoxCommand = `DISPLAY=:0 firefox --new-window --kiosk "${url}"`;
+    console.log('Executing:', firefoxCommand);
+    
     // Try Firefox first, then Firefox ESR as fallback
-    exec(`firefox --new-window --kiosk "${url}"`, (error) => {
+    exec(firefoxCommand, (error) => {
       if (error) {
         console.log('Firefox not found, trying firefox-esr...');
-        exec(`firefox-esr --new-window --kiosk "${url}"`, (esrError) => {
+        const esrCommand = `DISPLAY=:0 firefox-esr --new-window --kiosk "${url}"`;
+        exec(esrCommand, (esrError) => {
           if (esrError) {
             console.error('Firefox not found. Please install Firefox.');
             console.log('Falling back to default browser...');
@@ -324,6 +339,7 @@ function launchFirefoxInKioskMode(url) {
       }
     });
   }, 1000); // Wait 1 second before launching Firefox
+} Firefox
 }
 
 app.whenReady().then(createWindow);

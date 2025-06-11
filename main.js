@@ -18,7 +18,7 @@ class StreamingLauncher {
             },
             youtube: {
                 name: 'YouTube TV',
-                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/tv'],
+                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://youtube.com/'],
                 processName: 'firefox',
                 icon: '📺'
             },

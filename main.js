@@ -41,19 +41,7 @@ class StreamingLauncher {
                 icon: '🎯',
                 postLaunch: 'fullscreen'
             },
-            vlc: {
-                name: 'VLC Player',
-                command: ['vlc', '--intf', 'qt', '--fullscreen'],
-                processName: 'vlc',
-                icon: '🎵'
-            },
-            plex: {
-                name: 'Plex',
-                command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://app.plex.tv'],
-                processName: 'firefox',
-                icon: '📱'
-            },
-            prime: {
+                prime: {
                 name: 'Prime Video',
                 command: ['firefox', '--new-instance', '--kiosk', '--no-first-run', '--disable-session-crashed-bubble', 'https://primevideo.com'],
                 processName: 'firefox',

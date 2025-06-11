@@ -2,7 +2,7 @@
 I have tested and it works, but everything you see here is made by ChatGPT or Claude. I only made some small changes once everything was working.
 Honestly kinda crazy that it even works.
 
-I added ---- in this README where I actually wrote something and the AI. 
+I added ---- in this README where I actually wrote something and not the AI. 
 
 # 🎬 Streaming Launcher for your ----Arch openbox installation---- 
 

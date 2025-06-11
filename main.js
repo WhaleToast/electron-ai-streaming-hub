@@ -284,10 +284,22 @@ function launchFirefoxInKioskMode(url) {
     
     // Try Firefox first, then Firefox ESR as fallback
     exec(firefoxCommand, (error) => {
+      // CRITICAL: Check if Firefox should still be running before handling errors
+      if (!firefoxLaunched) {
+        console.log('Firefox was killed by user, ignoring exec callback');
+        return;
+      }
+      
       if (error) {
         console.log('Firefox not found, trying firefox-esr...');
         const esrCommand = `DISPLAY=:0 firefox-esr --new-window --kiosk "${url}"`;
         exec(esrCommand, (esrError) => {
+          // CRITICAL: Check again before fallback
+          if (!firefoxLaunched) {
+            console.log('Firefox was killed by user, ignoring ESR callback');
+            return;
+          }
+          
           if (esrError) {
             console.error('Firefox not found. Please install Firefox.');
             console.log('Falling back to default browser...');

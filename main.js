@@ -3,62 +3,34 @@ const { exec } = require('child_process');
 const path = require('path');
 
 let mainWindow = null;
-let cornerWindow = null;
 
 async function createWindow() {
+  // Get screen dimensions
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
   mainWindow = new BrowserWindow({
-    fullscreen: true,
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
+    frame: false,  // Remove window frame
+    fullscreen: false,  // Don't use fullscreen, use maximized instead
+    kiosk: true,  // Use kiosk mode instead
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
   
   mainWindow.loadFile('index.html');
-}
-
-function createCornerCloseButton() {
-  // Create a small invisible window in the top-left corner
-  cornerWindow = new BrowserWindow({
-    width: 100,
-    height: 100,
-    x: 0,
-    y: 0,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'corner-preload.js')
-    }
-  });
-
-  // Load a simple HTML page with a clickable area
-  cornerWindow.loadFile('corner.html');
   
-  // Hide the window initially
-  cornerWindow.hide();
-}
-
-function showCornerButton() {
-  if (cornerWindow) {
-    cornerWindow.show();
-    cornerWindow.setAlwaysOnTop(true, 'screen-saver');
-  }
-}
-
-function hideCornerButton() {
-  if (cornerWindow) {
-    cornerWindow.hide();
-  }
+  // Force window to be on top and maximized
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  mainWindow.maximize();
 }
 
 function closeFirefoxAndFocusMain() {
   console.log('Closing Firefox and returning to main window');
-  
-  // Hide the corner button
-  hideCornerButton();
   
   // Kill all Firefox processes
   exec('pkill firefox', (error) => {
@@ -68,17 +40,16 @@ function closeFirefoxAndFocusMain() {
     
     // Bring main window to focus
     if (mainWindow) {
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
       mainWindow.focus();
       mainWindow.show();
+      mainWindow.maximize();
     }
   });
 }
 
 function launchFirefoxInKioskMode(url) {
   console.log(`Launching Firefox in kiosk mode with URL: ${url}`);
-  
-  // Show the corner close button when Firefox launches
-  showCornerButton();
   
   // Try Firefox first, then Firefox ESR as fallback
   exec(`firefox --new-window --kiosk "${url}"`, (error) => {
@@ -88,7 +59,6 @@ function launchFirefoxInKioskMode(url) {
         if (esrError) {
           console.error('Firefox not found. Please install Firefox.');
           console.log('Falling back to default browser...');
-          hideCornerButton();
           shell.openExternal(url);
         }
       });
@@ -96,18 +66,13 @@ function launchFirefoxInKioskMode(url) {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  createCornerCloseButton();
-});
+app.whenReady().then(createWindow);
 
 // Handle requests from the UI to launch apps/URLs
 ipcMain.on('launch', (event, data) => {
   if (data.type === 'url') {
-    // Launch Firefox in kiosk mode
     launchFirefoxInKioskMode(data.target);
   } else if (data.type === 'app') {
-    // Launch a local app (e.g., Stremio)
     exec(data.target, (error) => {
       if (error) {
         console.error(`Error launching ${data.target}:`, error);
@@ -116,12 +81,21 @@ ipcMain.on('launch', (event, data) => {
   }
 });
 
-// Handle corner button click
-ipcMain.on('corner-clicked', () => {
-  closeFirefoxAndFocusMain();
-});
-
 // Add IPC handler to close Firefox from the renderer
 ipcMain.on('close-firefox', () => {
   closeFirefoxAndFocusMain();
+});
+
+// Handle window focus events
+app.on('browser-window-focus', () => {
+  if (mainWindow) {
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  }
+});
+
+// Quit when all windows are closed
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });

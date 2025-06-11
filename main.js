@@ -342,10 +342,13 @@ function launchStremioFullscreen() {
     
     // Try different ways to launch Stremio in fullscreen
     const stremioCommands = [
+      // Try with window manager commands to force fullscreen
+      'DISPLAY=:0 stremio --fullscreen --kiosk',
       'DISPLAY=:0 stremio --fullscreen',
+      'DISPLAY=:0 stremio --start-fullscreen',
       'DISPLAY=:0 stremio',
       'DISPLAY=:0 /usr/bin/stremio --fullscreen',
-      'DISPLAY=:0 flatpak run com.stremio.Stremio'
+      'DISPLAY=:0 flatpak run com.stremio.Stremio --fullscreen'
     ];
     
     function tryStremioCommand(commandIndex) {
@@ -375,6 +378,34 @@ function launchStremioFullscreen() {
           tryStremioCommand(commandIndex + 1);
         } else {
           console.log('Stremio launched successfully');
+          
+          // Try to force fullscreen after launch with window manager commands
+          setTimeout(() => {
+            if (stremioLaunched) {
+              console.log('Attempting to force Stremio fullscreen...');
+              
+              // Try various window manager commands to make Stremio fullscreen
+              exec('wmctrl -r "Stremio" -b add,fullscreen', (wmError) => {
+                if (wmError) {
+                  console.log('wmctrl not available, trying xdotool...');
+                  
+                  // Try with xdotool
+                  exec('xdotool search --name "Stremio" windowactivate --sync key F11', (xdoError) => {
+                    if (xdoError) {
+                      console.log('xdotool not available, trying openbox commands...');
+                      
+                      // Try openbox-specific command
+                      exec('openbox --reconfigure && wmctrl -r "Stremio" -b toggle,fullscreen', (obError) => {
+                        if (obError) {
+                          console.log('Could not force fullscreen automatically');
+                        }
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          }, 2000); // Wait 2 seconds for Stremio to fully load
         }
       });
     }

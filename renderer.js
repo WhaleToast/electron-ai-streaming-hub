@@ -11,6 +11,15 @@ class StreamingLauncherUI {
     }
 
     setupEventListeners() {
+        // Shutdown button
+        document.getElementById('shutdown-btn')?.addEventListener('click', () => {
+            window.electronAPI.shutdown();
+        });
+
+        // Restart button
+        document.getElementById('restart-btn')?.addEventListener('click', () => {
+            window.electronAPI.restart();
+        });
         // Quit button
         document.getElementById('quit-btn').addEventListener('click', () => {
             window.electronAPI.quitApp();

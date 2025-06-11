@@ -204,6 +204,13 @@ class StreamingLauncher {
         ipcMain.on('show-launcher', () => {
             this.terminateCurrentService();
         });
+        ipcMain.handle('shutdown', () => {
+        spawn('systemctl', ['poweroff'], { stdio: 'ignore', detached: true });
+        });
+
+        ipcMain.handle('restart', () => {
+            spawn('systemctl', ['reboot'], { stdio: 'ignore', detached: true });
+        });
     }
 
     async initialize() {

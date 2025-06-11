@@ -209,7 +209,7 @@ class StreamingLauncher {
         });
 
         ipcMain.handle('restart', () => {
-        spawn('systemctl', ['reboot'], { stdio: 'ignore', detached: true });
+        spawn('shutdown', ['-ar', 'now'], { stdio: 'ignore' });
         });
     }
 

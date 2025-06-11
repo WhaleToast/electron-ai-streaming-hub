@@ -106,8 +106,8 @@ class StreamingLauncher {
             skipTaskbar: true,
             resizable: false,
             focusable: false,
-            x: 20,
-            y: 20,
+            x: 0,
+            y: 0,
             hasShadow: false,
             webPreferences: {
                 nodeIntegration: false,

@@ -340,7 +340,7 @@ function launchFirefoxInKioskMode(url) {
     });
   }, 1000); // Wait 1 second before launching Firefox
 } Firefox
-}
+
 
 app.whenReady().then(createWindow);
 

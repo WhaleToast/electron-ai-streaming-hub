@@ -10,8 +10,8 @@
 
         #back-button {
             position: fixed;
-            top: 0rem;
-            left: 0px;
+            top: 5px;
+            left: 5;
             transition: left 0.3s ease, opacity 0.3s ease;
             opacity: 0;
             background: rgba(0, 0, 0, 1);
@@ -22,20 +22,20 @@
             font-size: 1rem;
             cursor: pointer;
             z-index: 9999;
-            widht: 20px;
+            width: 20px;
             height: 20px;
             pointer-events: none; /* <- This disables clickability when hidden */
         }
 
         #back-button.show {
             left: 0rem;
-            opacity: 0;
+            opacity: 1;
             pointer-events: auto; /* <- Re-enable clickability when visible */
         }
     </style>
 </head>
 <body>
-    <button id="back-button">Back</button>
+    <button id="back-button"></button>
 
     <script>
         const button = document.getElementById('back-button');

@@ -10,11 +10,11 @@
 
         #back-button {
             position: fixed;
-            top: 0.2rem;
-            left: -2px;
+            top: 0rem;
+            left: 0px;
             transition: left 0.3s ease, opacity 0.3s ease;
             opacity: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 1);
             color: white;
             border: none;
             padding: 0.7rem 1rem;
@@ -26,8 +26,8 @@
         }
 
         #back-button.show {
-            left: 0.2rem;
-            opacity: 1;
+            left: 0rem;
+            opacity: 0;
             pointer-events: auto; /* <- Re-enable clickability when visible */
         }
     </style>

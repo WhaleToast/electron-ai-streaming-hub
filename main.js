@@ -86,8 +86,8 @@ class StreamingLauncher {
 
     createOverlayWindow() {
         this.overlayWindow = new BrowserWindow({
-            width: 100,
-            height: 60,
+            width: 20,
+            height: 20,
             transparent: true,
             frame: false,
             alwaysOnTop: true,
